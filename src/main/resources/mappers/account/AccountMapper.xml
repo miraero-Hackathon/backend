@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.account.mapper.AccountMapper">
+
+  <!-- 조회 잔액은 저금통에 묶인 금액을 뺀 값이다. account.balance 원본은 목서버가 원천이라 수정하지 않는다. -->
+
+  <select id="findBalanceByIdAndUserIdForUpdate" resultType="long">
+    SELECT balance
+    FROM account
+    WHERE account_id = #{accountId}
+    AND user_id = #{userId}
+    FOR UPDATE
+  </select>
+
+  <update id="increaseBalance">
+    UPDATE account
+    SET balance = balance + #{amount}
+    WHERE account_id = #{accountId}
+    AND user_id = #{userId}
+  </update>
+
+  <update id="decreaseBalance">
+    UPDATE account
+    SET balance = balance - #{amount}
+    WHERE account_id = #{accountId}
+    AND user_id = #{userId}
+    AND balance >= #{amount}
+  </update>
+
+  <!-- ex_account_id UNIQUE 제약 기준 upsert. 신규면 INSERT, 이미 있으면 UPDATE절만 갱신 -->
+  <insert id="upsert"
+    parameterType="org.jejuro.miraero.domain.account.domain.Account">
+    INSERT INTO account (
+    user_id, financial_institution_id, ex_account_id, account_type, account_name,
+    account_number, account_number_hash, masked_account_number,
+    balance, account_status, opened_at, maturity_at, interest_rate, monthly_payment_limit
+    )
+    VALUES (
+    #{userId}, #{financialInstitutionId}, #{exAccountId}, #{accountType}, #{accountName},
+    #{accountNumber}, #{accountNumberHash}, #{maskedAccountNumber},
+    #{balance}, #{accountStatus}, #{openedAt}, #{maturityAt}, #{interestRate},
+    #{monthlyPaymentLimit}
+    )
+    ON DUPLICATE KEY UPDATE
+    account_name = VALUES(account_name),
+    balance = VALUES(balance),
+    account_status = VALUES(account_status),
+    maturity_at = VALUES(maturity_at),
+    interest_rate = VALUES(interest_rate),
+    monthly_payment_limit = VALUES(monthly_payment_limit),
+    synced_at = CURRENT_TIMESTAMP
+  </insert>
+
+  <!-- 거래 동기화 시 ex_account_id -> account_id 변환용 -->
+  <select id="findAccountIdByExAccountId" resultType="java.lang.Long">
+    SELECT account_id
+    FROM account
+    WHERE ex_account_id = #{exAccountId}
+  </select>
+
+  <select id="findByIdAndUserId" resultType="org.jejuro.miraero.domain.account.domain.Account">
+    SELECT
+    account_id, user_id, financial_institution_id, ex_account_id, account_type, account_name,
+    account_number, account_number_hash, masked_account_number,
+    balance, account_status, opened_at, maturity_at, interest_rate, monthly_payment_limit
+    FROM account
+    WHERE account_id = #{accountId}
+    AND user_id = #{userId}
+  </select>
+
+  <select id="existsByIdAndUserId" resultType="boolean">
+    SELECT EXISTS (
+    SELECT 1 FROM account
+    WHERE account_id = #{accountId}
+    AND user_id = #{userId}
+    )
+  </select>
+
+  <select id="findAllByUserId" resultType="org.jejuro.miraero.domain.account.dto.response.AccountResponse">
+    SELECT
+    a.account_id AS accountId,
+    a.account_type AS accountType,
+    a.account_name AS accountName,
+    fi.financial_institution_name AS institutionName,
+    a.masked_account_number AS maskedAccountNumber,
+    a.balance - COALESCE((SELECT SUM(mb.balance) FROM money_box mb
+                          WHERE mb.account_id = a.account_id), 0) AS balance,
+    a.account_status AS accountStatus,
+    a.opened_at AS openedAt,
+    a.maturity_at AS maturityAt,
+    a.interest_rate AS interestRate,
+    a.monthly_payment_limit AS monthlyPaymentLimit
+    FROM account a
+    INNER JOIN financial_institution fi
+    ON a.financial_institution_id = fi.financial_institution_id
+    WHERE a.user_id = #{userId}
+    <if test="accountType != null">
+      AND a.account_type = #{accountType}
+    </if>
+    <!-- 끌어쓰기 출처 후보 조회용. 이미 목표에 직접 연결된 계좌는 그 목표를 위한 돈이라 제외한다 -->
+    <if test="excludeGoalLinked">
+      <!-- 목표 자산으로 직접 연결된 계좌 -->
+      AND NOT EXISTS (
+        SELECT 1 FROM goal_asset ga
+        JOIN goal g ON ga.goal_id = g.goal_id
+        WHERE g.user_id = #{userId}
+          AND ga.asset_type = 'ACCOUNT'
+          AND ga.asset_id = a.account_id
+      )
+      <!--
+          목표 저금통이 올라가 있는 계좌.
+          끌어쓰기는 다른 계좌에서 자금을 가져오는 동작이라, 목표 자산이 이미
+          얹힌 계좌를 고르면 출금·입금이 같은 계좌가 되어 이체가 불가능하다.
+      -->
+      AND NOT EXISTS (
+        SELECT 1 FROM goal_asset ga
+        JOIN goal g ON ga.goal_id = g.goal_id
+        JOIN money_box mb ON mb.money_box_id = ga.asset_id
+        WHERE g.user_id = #{userId}
+          AND ga.asset_type = 'MONEY_BOX'
+          AND mb.account_id = a.account_id
+      )
+    </if>
+    ORDER BY a.account_id
+  </select>
+
+  <select id="findResponseById" resultType="org.jejuro.miraero.domain.account.dto.response.AccountResponse">
+    SELECT
+    a.account_id AS accountId,
+    a.account_type AS accountType,
+    a.account_name AS accountName,
+    fi.financial_institution_name AS institutionName,
+    a.masked_account_number AS maskedAccountNumber,
+    a.balance - COALESCE((SELECT SUM(mb.balance) FROM money_box mb
+                          WHERE mb.account_id = a.account_id), 0) AS balance,
+    a.account_status AS accountStatus,
+    a.opened_at AS openedAt,
+    a.maturity_at AS maturityAt,
+    a.interest_rate AS interestRate,
+    a.monthly_payment_limit AS monthlyPaymentLimit
+    FROM account a
+    INNER JOIN financial_institution fi
+    ON a.financial_institution_id = fi.financial_institution_id
+    WHERE a.account_id = #{accountId}
+  </select>
+
+  <select id="findResponseByIdAndUserId" resultType="org.jejuro.miraero.domain.account.dto.response.AccountResponse">
+    SELECT
+    a.account_id AS accountId,
+    a.account_type AS accountType,
+    a.account_name AS accountName,
+    fi.financial_institution_name AS institutionName,
+    a.masked_account_number AS maskedAccountNumber,
+    a.balance - COALESCE((SELECT SUM(mb.balance) FROM money_box mb
+                          WHERE mb.account_id = a.account_id), 0) AS balance,
+    a.account_status AS accountStatus,
+    a.opened_at AS openedAt,
+    a.maturity_at AS maturityAt,
+    a.interest_rate AS interestRate,
+    a.monthly_payment_limit AS monthlyPaymentLimit
+    FROM account a
+    INNER JOIN financial_institution fi
+    ON a.financial_institution_id = fi.financial_institution_id
+    WHERE a.account_id = #{accountId}
+    AND a.user_id = #{userId}
+  </select>
+
+  <select id="findResponsesByIds"
+          resultType="org.jejuro.miraero.domain.account.dto.response.AccountResponse">
+
+    SELECT
+      a.account_id AS accountId,
+      a.account_type AS accountType,
+      a.account_name AS accountName,
+      fi.financial_institution_name AS institutionName,
+      a.masked_account_number AS maskedAccountNumber,
+      a.balance - COALESCE((
+        SELECT SUM(mb.balance)
+        FROM money_box mb
+        WHERE mb.account_id = a.account_id
+      ), 0) AS balance,
+      a.account_status AS accountStatus,
+      a.opened_at AS openedAt,
+      a.maturity_at AS maturityAt,
+      a.interest_rate AS interestRate,
+      a.monthly_payment_limit AS monthlyPaymentLimit
+    FROM account a
+    INNER JOIN financial_institution fi
+      ON a.financial_institution_id = fi.financial_institution_id
+    WHERE a.user_id = #{userId}
+      AND a.account_id IN
+      <foreach collection="accountIds"
+               item="accountId"
+               open="("
+               separator=","
+               close=")">
+          #{accountId}
+      </foreach>
+
+  </select>
+</mapper>

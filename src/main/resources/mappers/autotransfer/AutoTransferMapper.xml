@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.autotransfer.mapper.AutoTransferMapper">
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.autotransfer.domain.AutoTransfer"
+            useGeneratedKeys="true"
+            keyProperty="autoTransferId">
+
+        INSERT INTO auto_transfer
+        (
+            withdrawal_account_id,
+            deposit_account_id,
+            money_box_id,
+            deposit_institution_name,
+            masked_deposit_account,
+            transfer_amount,
+            transfer_day,
+            start_date,
+            end_date,
+            auto_transfer_status
+        )
+        VALUES
+        (
+            #{withdrawalAccountId},
+            #{depositAccountId},
+            #{moneyBoxId},
+            #{depositInstitutionName},
+            #{maskedDepositAccount},
+            #{transferAmount},
+            #{transferDay},
+            #{startDate},
+            #{endDate},
+            #{autoTransferStatus}
+        )
+
+    </insert>
+
+    <select id="findByAsset"
+            resultType="org.jejuro.miraero.domain.autotransfer.domain.AutoTransfer">
+
+        SELECT
+            auto_transfer_id,
+            withdrawal_account_id,
+            deposit_account_id,
+            money_box_id,
+            deposit_institution_name,
+            masked_deposit_account,
+            transfer_amount,
+            transfer_day,
+            start_date,
+            end_date,
+            auto_transfer_status,
+            created_at,
+            updated_at
+        FROM auto_transfer
+        WHERE
+            (
+            ( #{assetType} = 'MONEY_BOX'
+            AND money_box_id = #{assetId} )
+            OR
+            ( #{assetType} = 'ACCOUNT'
+                AND deposit_account_id = #{assetId} )
+            )
+            AND auto_transfer_status = 'ACTIVE'
+
+    </select>
+
+    <select id="findByAssets"
+            resultType="org.jejuro.miraero.domain.autotransfer.domain.AutoTransfer">
+
+        SELECT
+            auto_transfer_id,
+            withdrawal_account_id,
+            deposit_account_id,
+            money_box_id,
+            deposit_institution_name,
+            masked_deposit_account,
+            transfer_amount,
+            transfer_day,
+            start_date,
+            end_date,
+            auto_transfer_status,
+            created_at,
+            updated_at
+        FROM auto_transfer
+        WHERE auto_transfer_status = 'ACTIVE'
+            AND (
+                <if test="accountIds != null and !accountIds.isEmpty()">
+                    deposit_account_id IN
+                    <foreach collection="accountIds"
+                             item="accountId"
+                             open="("
+                             separator=","
+                             close=")">
+                        #{accountId}
+                    </foreach>
+                </if>
+
+                <if test="accountIds != null and !accountIds.isEmpty()
+                          and moneyBoxIds != null and !moneyBoxIds.isEmpty()">
+                    OR
+                </if>
+
+                <if test="moneyBoxIds != null and !moneyBoxIds.isEmpty()">
+                    money_box_id IN
+                    <foreach collection="moneyBoxIds"
+                             item="moneyBoxId"
+                             open="("
+                             separator=","
+                             close=")">
+                        #{moneyBoxId}
+                    </foreach>
+                </if>
+            )
+
+    </select>
+
+
+    <!--
+        현재 목표 자동이체 금액
+        ACCOUNT + MONEY_BOX 모두 조회
+    -->
+    <select id="findTargetGoalAutoTransferAmount"
+            resultType="long">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM (
+        <!-- ACCOUNT 연결 -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN auto_transfer at
+                    ON at.deposit_account_id = ga.asset_id
+            WHERE ga.goal_id = #{goalId}
+                AND ga.asset_type = 'ACCOUNT'
+                AND at.auto_transfer_status = 'ACTIVE'
+        UNION ALL
+        <!-- MONEY_BOX 연결 -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN auto_transfer at
+                    ON at.money_box_id = ga.asset_id
+            WHERE ga.goal_id = #{goalId}
+                AND ga.asset_type = 'MONEY_BOX'
+                AND at.auto_transfer_status = 'ACTIVE'
+        ) temp
+    </select>
+
+    <!--
+       다른 목표 자동이체 금액
+   -->
+    <select id="findOtherGoalAutoTransferAmount"
+            resultType="long">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM (
+            <!-- ACCOUNT -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN goal g
+                    ON ga.goal_id = g.goal_id
+                JOIN auto_transfer at
+                    ON at.deposit_account_id = ga.asset_id
+            WHERE g.user_id = #{userId}
+                AND g.goal_id != #{goalId}
+                AND ga.asset_type = 'ACCOUNT'
+                AND at.auto_transfer_status = 'ACTIVE'
+        UNION ALL
+            <!-- MONEY_BOX -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN goal g
+                    ON ga.goal_id = g.goal_id
+                JOIN auto_transfer at
+                    ON at.money_box_id = ga.asset_id
+            WHERE g.user_id = #{userId}
+                AND g.goal_id != #{goalId}
+                AND ga.asset_type = 'MONEY_BOX'
+                AND at.auto_transfer_status = 'ACTIVE'
+        ) temp
+    </select>
+
+    <!--
+        목표 구분 없는 전체 자동이체 금액.
+        목표별로 나누는 위 두 쿼리와 달리 사용자 기준으로 한 번에 합산한다.
+    -->
+    <select id="findTotalAutoTransferAmount"
+            resultType="long">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM (
+            <!-- ACCOUNT -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN goal g
+                    ON ga.goal_id = g.goal_id
+                JOIN auto_transfer at
+                    ON at.deposit_account_id = ga.asset_id
+            WHERE g.user_id = #{userId}
+                AND ga.asset_type = 'ACCOUNT'
+                AND at.auto_transfer_status = 'ACTIVE'
+        UNION ALL
+            <!-- MONEY_BOX -->
+            SELECT at.transfer_amount AS amount
+            FROM goal_asset ga
+                JOIN goal g
+                    ON ga.goal_id = g.goal_id
+                JOIN auto_transfer at
+                    ON at.money_box_id = ga.asset_id
+            WHERE g.user_id = #{userId}
+                AND ga.asset_type = 'MONEY_BOX'
+                AND at.auto_transfer_status = 'ACTIVE'
+        ) temp
+    </select>
+
+    <!--
+        실행 대상 조회.
+        transfer_day가 그달 말일보다 크면(예: 31일 설정 + 2월) 말일에 실행한다.
+        availableBalance는 계좌 잔액에서 그 계좌의 저금통 합계를 뺀 값이다.
+    -->
+    <select id="findExecutionTargets"
+            resultType="org.jejuro.miraero.domain.autotransfer.domain.AutoTransferTarget">
+        SELECT
+            at.auto_transfer_id                                     AS autoTransferId,
+            mb.money_box_id                                         AS moneyBoxId,
+            mb.account_id                                           AS accountId,
+            mb.user_id                                              AS userId,
+            at.transfer_amount                                      AS transferAmount,
+            a.balance - COALESCE((SELECT SUM(other.balance)
+                                  FROM money_box other
+                                  WHERE other.account_id = a.account_id), 0) AS availableBalance
+        FROM auto_transfer at
+            JOIN money_box mb
+                ON at.money_box_id = mb.money_box_id
+            JOIN account a
+                ON mb.account_id = a.account_id
+        WHERE at.auto_transfer_status = 'ACTIVE'
+            AND (
+                at.transfer_day = DAY(#{executionDate})
+                OR (at.transfer_day <![CDATA[>]]> DAY(LAST_DAY(#{executionDate}))
+                    AND DAY(#{executionDate}) = DAY(LAST_DAY(#{executionDate})))
+            )
+            <if test="userId != null">
+                AND mb.user_id = #{userId}
+            </if>
+        ORDER BY at.auto_transfer_id
+    </select>
+
+    <delete id="deleteByMoneyBoxId">
+        DELETE FROM auto_transfer
+        WHERE money_box_id = #{moneyBoxId}
+    </delete>
+
+</mapper>

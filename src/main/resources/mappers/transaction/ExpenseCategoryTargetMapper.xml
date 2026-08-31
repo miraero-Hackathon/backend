@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.transaction.mapper.ExpenseCategoryTargetMapper">
+
+    <resultMap id="expenseCategoryTargetMap"
+               type="org.jejuro.miraero.domain.transaction.domain.ExpenseCategoryTargetQueryResult">
+        <id property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="targetAmount" column="target_amount"/>
+    </resultMap>
+
+    <sql id="targetColumns">
+        ec.expense_category_id AS category_id,
+        ec.category_name,
+        ect.target_amount
+    </sql>
+
+    <select id="findTargetsByUserId" resultMap="expenseCategoryTargetMap">
+        SELECT
+            <include refid="targetColumns"/>
+        FROM expense_category ec
+        LEFT JOIN expense_category_target ect
+            ON ect.expense_category_id = ec.expense_category_id
+            AND ect.user_id = #{userId}
+        ORDER BY ec.expense_category_id ASC
+    </select>
+
+    <select id="findTargetsByUserIdAndCategoryIds" resultMap="expenseCategoryTargetMap">
+        SELECT
+            <include refid="targetColumns"/>
+        FROM expense_category ec
+        INNER JOIN expense_category_target ect
+            ON ect.expense_category_id = ec.expense_category_id
+            AND ect.user_id = #{userId}
+        WHERE ec.expense_category_id IN
+        <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+            #{categoryId}
+        </foreach>
+        ORDER BY ec.expense_category_id ASC
+    </select>
+
+    <select id="countExistingCategoriesByIds" resultType="long">
+        SELECT COUNT(*)
+        FROM expense_category
+        WHERE expense_category_id IN
+        <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">
+            #{categoryId}
+        </foreach>
+    </select>
+
+    <insert id="upsertTargets">
+        INSERT INTO expense_category_target (
+            user_id,
+            expense_category_id,
+            target_amount
+        ) VALUES
+        <foreach collection="targets" item="target" separator=",">
+            (
+                #{userId},
+                #{target.categoryId},
+                #{target.targetAmount}
+            )
+        </foreach>
+        AS new
+        ON DUPLICATE KEY UPDATE
+            target_amount = new.target_amount
+    </insert>
+</mapper>

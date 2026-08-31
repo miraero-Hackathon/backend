@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.product.mapper.SavingOptionMapper">
+
+    <insert id="upsert"
+            parameterType="org.jejuro.miraero.domain.product.domain.SavingOption">
+        INSERT INTO saving_option (
+            saving_product_id,
+            interest_rate_type,
+            reserve_type,
+            save_term,
+            base_interest_rate,
+            max_interest_rate
+        ) VALUES (
+            #{savingProductId},
+            #{interestRateType},
+            #{reserveType},
+            #{saveTerm},
+            #{baseInterestRate},
+            #{maxInterestRate}
+        ) AS new
+        ON DUPLICATE KEY UPDATE
+            base_interest_rate = new.base_interest_rate,
+            max_interest_rate = new.max_interest_rate
+    </insert>
+</mapper>

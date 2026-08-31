@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.transaction.mapper.ExpenseAnalysisMapper">
+    <resultMap id="categoryMonthExpenseMap"
+               type="org.jejuro.miraero.domain.transaction.domain.CategoryMonthExpenseQueryResult">
+        <id property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="previousMonthAmount" column="previous_month_amount"/>
+        <result property="currentMonthAmount" column="current_month_amount"/>
+    </resultMap>
+    <sql id="expenseCondition">
+        WHERE t.user_id = #{userId}
+          AND t.transaction_type = 'PAYMENT'
+          AND t.transacted_at <![CDATA[>=]]> #{condition.startDateTime}
+          AND t.transacted_at <![CDATA[<]]> #{condition.endDateTime}
+    </sql>
+    <select id="findCategoryThreeMonthExpenses" resultType="org.jejuro.miraero.domain.transaction.domain.CategoryThreeMonthExpenseQueryResult">
+        SELECT t.expense_category_id AS categoryId, ec.category_name AS categoryName, SUM(t.amount) AS totalAmount
+        FROM `transaction` t LEFT JOIN expense_category ec ON t.expense_category_id = ec.expense_category_id
+        <include refid="expenseCondition"/> GROUP BY t.expense_category_id, ec.category_name ORDER BY totalAmount DESC, t.expense_category_id ASC
+    </select>
+    <select id="findCategoryMonthExpenses" resultMap="categoryMonthExpenseMap">
+        SELECT
+            ec.expense_category_id AS category_id,
+            ec.category_name,
+            COALESCE(SUM(CASE
+                WHEN t.transacted_at <![CDATA[>=]]> #{previousMonthStartDateTime}
+                    AND t.transacted_at <![CDATA[<]]> #{currentMonthStartDateTime}
+                THEN t.amount ELSE 0 END), 0) AS previous_month_amount,
+            COALESCE(SUM(CASE
+                WHEN t.transacted_at <![CDATA[>=]]> #{currentMonthStartDateTime}
+                    AND t.transacted_at <![CDATA[<]]> #{currentMonthEndDateTime}
+                THEN t.amount ELSE 0 END), 0) AS current_month_amount
+        FROM expense_category ec
+        LEFT JOIN `transaction` t
+            ON t.expense_category_id = ec.expense_category_id
+            AND t.user_id = #{userId}
+            AND t.transaction_type = 'PAYMENT'
+            AND t.transacted_at <![CDATA[>=]]> #{previousMonthStartDateTime}
+            AND t.transacted_at <![CDATA[<]]> #{currentMonthEndDateTime}
+        GROUP BY ec.expense_category_id, ec.category_name
+        ORDER BY ec.expense_category_id ASC
+    </select>
+</mapper>

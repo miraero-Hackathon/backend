@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.mydata.mapper.MyDataConsentMapper">
+
+  <insert id="save"
+    parameterType="org.jejuro.miraero.domain.mydata.domain.MyDataConsent">
+    INSERT INTO mydata_consent(
+    user_id,
+    terms_version,
+    agreed_at,
+    expires_at,
+    revoked_at,
+    agree_status
+    )
+    VALUES (
+    #{userId},
+    #{termsVersion},
+    #{agreedAt},
+    #{expiresAt},
+    #{revokedAt},
+    #{agreeStatus}
+    )
+  </insert>
+
+  <select id="findConnectionsByUserId"
+    resultType="org.jejuro.miraero.domain.mydata.dto.MyDataConnectionResponse">
+    SELECT mc.connection_id AS connectionId,
+    fi.financial_institution_name AS institutionName,
+    mc.connection_status AS connectionStatus,
+    mc.expires_at AS expiresAt,
+    mc.synced_at AS lastSyncedAt,
+    mc.connection_status AS syncStatus
+    FROM mydata_connection mc
+    INNER JOIN financial_institution fi
+    ON mc.financial_institution_id = fi.financial_institution_id
+    WHERE mc.user_id = #{userId}
+    ORDER BY mc.synced_at DESC
+  </select>
+
+  <insert id="upsertConnection">
+    INSERT INTO mydata_connection (
+    user_id, financial_institution_id, connection_status, expires_at
+    )
+    VALUES (
+    #{userId}, #{financialInstitutionId}, #{connectionStatus}, #{expiresAt}
+    )
+    ON DUPLICATE KEY UPDATE
+    connection_status = VALUES(connection_status),
+    expires_at = VALUES(expires_at)
+  </insert>
+
+  <update id="updateSyncedAt">
+    UPDATE mydata_connection
+    SET synced_at = CURRENT_TIMESTAMP
+    WHERE user_id = #{userId}
+    AND financial_institution_id = #{financialInstitutionId}
+  </update>
+</mapper>

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.moneybox.mapper.MoneyBoxMapper">
+
+  <sql id="columns">
+    money_box_id,
+    user_id,
+    account_id,
+    balance,
+    money_box_type,
+    created_at,
+    updated_at
+  </sql>
+
+  <insert id="insert"
+    keyProperty="moneyBoxId"
+    parameterType="org.jejuro.miraero.domain.moneybox.domain.MoneyBox"
+    useGeneratedKeys="true">
+
+    INSERT INTO money_box(
+    user_id,
+    account_id,
+    balance,
+    money_box_type
+    )
+    VALUES (
+    #{userId},
+    #{accountId},
+    #{balance},
+    #{moneyBoxType}
+    )
+
+  </insert>
+
+  <update id="increaseBalance">
+    UPDATE money_box
+    SET balance = balance + #{amount}
+    WHERE money_box_id = #{moneyBoxId}
+  </update>
+
+  <update id="decreaseBalance">
+    UPDATE money_box
+    SET balance = balance - #{amount}
+    WHERE money_box_id = #{moneyBoxId}
+    AND user_id = #{userId}
+    AND balance >= #{amount}
+  </update>
+
+  <select id="findBalanceById" resultType="java.lang.Long">
+    SELECT balance
+    FROM money_box
+    WHERE money_box_id = #{moneyBoxId}
+  </select>
+
+  <select id="sumBalanceByAccountId" resultType="java.lang.Long">
+    SELECT COALESCE(SUM(balance), 0)
+    FROM money_box
+    WHERE account_id = #{accountId}
+  </select>
+
+  <select id="existsByIdAndUserId" resultType="boolean">
+    SELECT EXISTS (
+    SELECT 1
+    FROM money_box
+    WHERE money_box_id = #{moneyBoxId}
+    AND user_id = #{userId}
+    AND money_box_type = 'GOAL'
+    )
+  </select>
+
+  <select id="findById"
+    resultType="org.jejuro.miraero.domain.moneybox.domain.MoneyBox">
+    SELECT
+    <include refid="columns"/>
+    FROM money_box
+    WHERE money_box_id = #{moneyBoxId}
+  </select>
+
+  <select id="findByIds"
+          resultType="org.jejuro.miraero.domain.moneybox.domain.MoneyBox">
+
+    SELECT
+      <include refid="columns"/>
+    FROM money_box
+    WHERE user_id = #{userId}
+      AND money_box_type = 'GOAL'
+      AND money_box_id IN
+      <foreach collection="moneyBoxIds"
+               item="moneyBoxId"
+               open="("
+               separator=","
+               close=")">
+        #{moneyBoxId}
+      </foreach>
+
+  </select>
+
+  <select id="findPaceMakerMoneyBoxByIdAndUserIdForUpdate"
+    resultType="org.jejuro.miraero.domain.moneybox.domain.MoneyBox">
+    SELECT
+    <include refid="columns"/>
+    FROM money_box
+    WHERE money_box_id = #{moneyBoxId}
+    AND user_id = #{userId}
+    AND money_box_type = 'SAVING'
+    FOR UPDATE
+  </select>
+
+  <delete id="deleteById">
+    DELETE FROM money_box
+    WHERE money_box_id = #{moneyBoxId}
+  </delete>
+
+</mapper>

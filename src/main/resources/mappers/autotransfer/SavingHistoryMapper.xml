@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.autotransfer.mapper.SavingHistoryMapper">
+
+    <!--
+        INSERT IGNORE로 중복 실행을 DB가 막는다.
+        배치가 두 번 돌거나 수동 실행과 겹쳐도 두 번 적립되지 않는다.
+        auto_saving_id는 페이스메이커 적립에서만 채워지므로 여기서는 넣지 않는다.
+    -->
+    <insert id="insertIgnoreDuplicate">
+        INSERT IGNORE INTO auto_saving_history
+        (
+            money_box_id,
+            amount,
+            transacted_at,
+            transfer_status
+        )
+        VALUES
+        (
+            #{moneyBoxId},
+            #{amount},
+            #{transactedAt},
+            #{transferStatus}
+        )
+    </insert>
+
+    <!--
+        페이스메이커 적립. 대시보드 조회가 auto_saving_id로 조인하므로 함께 기록한다.
+        중복 방지는 목표 자동이체와 동일하게 (money_box_id, transacted_at) UNIQUE가 담당한다.
+    -->
+    <insert id="insertPaceMakerIgnoreDuplicate">
+        INSERT IGNORE INTO auto_saving_history
+        (
+            money_box_id,
+            auto_saving_id,
+            amount,
+            transacted_at,
+            transfer_status
+        )
+        VALUES
+        (
+            #{moneyBoxId},
+            #{autoSavingId},
+            #{amount},
+            #{transactedAt},
+            #{transferStatus}
+        )
+    </insert>
+
+    <!--
+        구간 내 적립 이력 집계.
+        auto_saving_history에는 user_id가 없어 money_box를 거쳐 사용자를 찾는다.
+        목표 자동이체(auto_saving_id NULL)와 페이스메이커를 함께 집계한다.
+    -->
+    <select id="findSummary"
+            resultType="org.jejuro.miraero.domain.autotransfer.domain.SavingHistorySummary">
+        SELECT
+            COUNT(*) AS attemptCount,
+            COALESCE(SUM(h.transfer_status = 'SUCCESS'), 0) AS successCount,
+            COALESCE(SUM(h.transfer_status = 'PARTIAL_LIMIT'), 0) AS partialCount,
+            COALESCE(SUM(h.transfer_status = 'FAILED_INSUFFICIENT_FUNDS'), 0) AS failedCount,
+            COALESCE(SUM(h.amount), 0) AS totalSavedAmount,
+            (
+                <!--
+                    연속 적립일 계산. 날짜에서 행 번호를 빼면 연속된 날끼리 같은 값이 되어
+                    그 값으로 묶으면 구간별 길이가 나온다.
+                -->
+                SELECT COALESCE(MAX(streak.days), 0)
+                FROM (
+                    SELECT COUNT(*) AS days
+                    FROM (
+                        SELECT DATE_SUB(
+                                   s.transacted_at,
+                                   INTERVAL ROW_NUMBER() OVER (ORDER BY s.transacted_at) DAY
+                               ) AS grp
+                        FROM auto_saving_history s
+                            JOIN money_box smb ON s.money_box_id = smb.money_box_id
+                        WHERE smb.user_id = #{userId}
+                            AND s.transacted_at <![CDATA[>=]]> #{startDate}
+                            AND s.transacted_at <![CDATA[<=]]> #{endDate}
+                            AND s.transfer_status <![CDATA[<>]]> 'FAILED_INSUFFICIENT_FUNDS'
+                    ) grouped
+                    GROUP BY grouped.grp
+                ) streak
+            ) AS maxStreak
+        FROM auto_saving_history h
+            JOIN money_box mb ON h.money_box_id = mb.money_box_id
+        WHERE mb.user_id = #{userId}
+            AND h.transacted_at <![CDATA[>=]]> #{startDate}
+            AND h.transacted_at <![CDATA[<=]]> #{endDate}
+    </select>
+
+</mapper>

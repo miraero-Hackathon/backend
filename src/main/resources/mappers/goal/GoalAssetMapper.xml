@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.goal.mapper.GoalAssetMapper">
+
+    <!-- 목표 연결 자산 저장 -->
+    <insert id="saveAll">
+
+        INSERT INTO goal_asset (
+            goal_id,
+            asset_type,
+            asset_id
+        )
+        VALUES
+
+        <foreach collection="assets" item="asset" separator=",">
+            (
+            #{goalId},
+            #{asset.assetType},
+            #{asset.assetId}
+            )
+        </foreach>
+
+    </insert>
+
+    <resultMap id="goalAssetResultMap"
+               type="org.jejuro.miraero.domain.goal.domain.GoalAsset">
+
+        <id property="goalAssetId" column="goal_asset_id"/>
+        <result property="goalId" column="goal_id"/>
+        <result property="assetType" column="asset_type"/>
+        <result property="assetId" column="asset_id"/>
+        <result property="createdAt" column="created_at"/>
+
+    </resultMap>
+
+
+    <select id="findByGoalId"
+            resultMap="goalAssetResultMap">
+        SELECT
+            goal_asset_id,
+            goal_id,
+            asset_type,
+            asset_id,
+            created_at
+        FROM goal_asset
+        WHERE goal_id = #{goalId}
+    </select>
+
+    <select id="existsByAsset" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM goal_asset
+            WHERE  asset_type = #{assetType}
+              AND asset_id = #{assetId}
+        )
+    </select>
+
+    <delete id="delete">
+        DELETE FROM goal_asset
+        WHERE goal_id = #{goalId}
+        AND asset_type = #{assetType}
+        AND asset_id = #{assetId}
+    </delete>
+
+    <select id="existsByGoalIdAndAsset" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM goal_asset
+            WHERE goal_id = #{goalId}
+              AND asset_type = #{assetType}
+              AND asset_id = #{assetId}
+        )
+    </select>
+
+    <select id="findByGoalIds"
+            resultMap="goalAssetResultMap">
+
+        SELECT
+            goal_asset_id,
+            goal_id,
+            asset_type,
+            asset_id,
+            created_at
+        FROM goal_asset
+        WHERE goal_id IN
+        <foreach collection="goalIds"
+                 item="goalId"
+                 open="("
+                 separator=","
+                 close=")">
+            #{goalId}
+        </foreach>
+
+    </select>
+
+</mapper>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.aicoach.mapper.AiCoachFinancialContextMapper">
+
+    <resultMap id="activeGoalResultMap"
+               type="org.jejuro.miraero.domain.aicoach.context.AiCoachFinancialContext$ActiveGoal">
+        <result property="goalName" column="goal_name"/>
+        <result property="goalAmount" column="goal_amount"/>
+        <result property="goalDate" column="goal_date"/>
+    </resultMap>
+
+    <select id="findActiveGoalsByUserId" resultMap="activeGoalResultMap">
+        SELECT
+            goal_name,
+            goal_amount,
+            goal_date
+        FROM goal
+        WHERE user_id = #{userId}
+          AND goal_status = 'ACTIVE'
+        ORDER BY goal_date ASC, goal_id ASC
+    </select>
+
+    <select id="sumAccountBalancesByUserId" resultType="long">
+        SELECT COALESCE(SUM(balance), 0)
+        FROM account
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="sumMoneyBoxBalancesByUserId" resultType="long">
+        SELECT COALESCE(SUM(balance), 0)
+        FROM money_box
+        WHERE user_id = #{userId}
+    </select>
+
+    <select id="sumLoanRemainingAmountsByUserId" resultType="long">
+        SELECT COALESCE(SUM(remaining_amount), 0)
+        FROM loan
+        WHERE user_id = #{userId}
+    </select>
+
+</mapper>

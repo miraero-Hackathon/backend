@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.aicoach.mapper.AiCoachMessageMapper">
+
+    <resultMap id="aiCoachMessageResultMap"
+               type="org.jejuro.miraero.domain.aicoach.domain.AiCoachMessage">
+        <id property="aiCoachMessageId" column="ai_coach_message_id"/>
+        <result property="aiCoachConversationId" column="ai_coach_conversation_id"/>
+        <result property="senderType" column="sender_type"/>
+        <result property="content" column="content"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="messageColumns">
+        ai_coach_message_id,
+        ai_coach_conversation_id,
+        sender_type,
+        content,
+        created_at
+    </sql>
+
+    <select id="findAllByConversationId" resultMap="aiCoachMessageResultMap">
+        SELECT
+            <include refid="messageColumns"/>
+        FROM ai_coach_message
+        WHERE ai_coach_conversation_id = #{conversationId}
+        ORDER BY created_at ASC, ai_coach_message_id ASC
+    </select>
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.aicoach.domain.AiCoachMessage"
+            useGeneratedKeys="true"
+            keyProperty="aiCoachMessageId"
+            keyColumn="ai_coach_message_id">
+        INSERT INTO ai_coach_message (
+            ai_coach_conversation_id,
+            sender_type,
+            content
+        )
+        VALUES (
+            #{aiCoachConversationId},
+            #{senderType},
+            #{content}
+        )
+    </insert>
+
+    <select id="countByConversationId" resultType="int">
+        SELECT COUNT(*)
+        FROM ai_coach_message
+        WHERE ai_coach_conversation_id = #{conversationId}
+    </select>
+
+</mapper>

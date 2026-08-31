@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.goal.milestone.mapper.MilestoneMapper">
+
+    <select id="findByGoalId"
+            parameterType="long"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone">
+
+        SELECT
+            milestone_id,
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved,
+            achieved_at
+        FROM milestone
+        WHERE goal_id = #{goalId}
+        ORDER BY milestone_percentage ASC
+
+    </select>
+
+
+    <select id="findById"
+            parameterType="long"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone">
+
+        SELECT
+            milestone_id,
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved,
+            achieved_at
+        FROM milestone
+        WHERE milestone_id = #{milestoneId}
+
+    </select>
+
+    <select id="findPreviousMilestone"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone">
+        SELECT
+            milestone_id,
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved,
+            achieved_at
+        FROM milestone
+        WHERE goal_id = #{goalId}
+            AND milestone_percentage <![CDATA[<]]> #{percentage}
+        ORDER BY milestone_percentage DESC
+        LIMIT 1
+
+    </select>
+
+    <select id="findByGoalIdAndPercentage"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone">
+        SELECT
+            milestone_id,
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved,
+            achieved_at
+        FROM milestone
+        WHERE goal_id = #{goalId}
+        AND milestone_percentage = #{percentage}
+    </select>
+
+
+
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone"
+            useGeneratedKeys="true"
+            keyProperty="milestoneId">
+
+        INSERT INTO milestone (
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved
+        )
+        VALUES (
+            #{milestone.goalId},
+            #{milestone.milestonePercentage},
+            #{milestone.milestoneAmount},
+            #{milestone.achieved}
+        )
+
+    </insert>
+
+
+    <insert id="saveAll"
+            parameterType="java.util.List">
+
+        INSERT INTO milestone (
+            goal_id,
+            milestone_percentage,
+            milestone_amount,
+            achieved
+        )
+        VALUES
+
+        <foreach collection="milestones"
+                 item="milestone"
+                 separator=",">
+            (
+                #{milestone.goalId},
+                #{milestone.milestonePercentage},
+                #{milestone.milestoneAmount},
+                #{milestone.achieved}
+            )
+        </foreach>
+
+    </insert>
+
+    <delete id="deleteByGoalId"
+            parameterType="long">
+        DELETE FROM milestone
+        WHERE goal_id = #{goalId}
+    </delete>
+
+
+    <update id="updateAchievement"
+            parameterType="org.jejuro.miraero.domain.goal.milestone.domain.Milestone">
+
+        UPDATE milestone
+        SET
+            achieved = #{milestone.achieved},
+            achieved_at = #{milestone.achievedAt}
+        WHERE milestone_id = #{milestone.milestoneId}
+        AND achieved = FALSE
+
+    </update>
+
+</mapper>

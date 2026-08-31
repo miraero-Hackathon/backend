@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.transaction.mapper.PeerAverageMapper">
+    <select id="findCategoryPeerAverages"
+            resultType="org.jejuro.miraero.domain.transaction.domain.PeerCategoryAverageQueryResult">
+        WITH target_user AS (
+            SELECT
+                CASE
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) BETWEEN 20 AND 24 THEN 'AGE_20_24'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) BETWEEN 25 AND 29 THEN 'AGE_25_29'
+                    WHEN TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) BETWEEN 30 AND 34 THEN 'AGE_30_34'
+                END AS age_group
+            FROM miraero_user
+            WHERE user_id = #{userId}
+        ),
+        peer_users AS (
+            SELECT peer.user_id
+            FROM miraero_user peer
+            CROSS JOIN target_user target
+            WHERE CASE
+                WHEN TIMESTAMPDIFF(YEAR, peer.birth_date, CURDATE()) BETWEEN 20 AND 24 THEN 'AGE_20_24'
+                WHEN TIMESTAMPDIFF(YEAR, peer.birth_date, CURDATE()) BETWEEN 25 AND 29 THEN 'AGE_25_29'
+                WHEN TIMESTAMPDIFF(YEAR, peer.birth_date, CURDATE()) BETWEEN 30 AND 34 THEN 'AGE_30_34'
+            END = target.age_group
+              AND peer.user_id != #{userId}
+        ),
+        peer_category_expenses AS (
+            SELECT
+                peer.user_id,
+                transaction_data.expense_category_id AS category_id,
+                SUM(transaction_data.amount) AS total_amount
+            FROM peer_users peer
+            JOIN `transaction` transaction_data
+                ON transaction_data.user_id = peer.user_id
+            WHERE transaction_data.transaction_type = 'PAYMENT'
+              AND transaction_data.transacted_at <![CDATA[>=]]> #{startDateTime}
+              AND transaction_data.transacted_at <![CDATA[<]]> #{endDateTime}
+            GROUP BY peer.user_id, transaction_data.expense_category_id
+        )
+        SELECT
+            category.expense_category_id AS categoryId,
+            category.category_name AS categoryName,
+            CAST(FLOOR(
+                (benchmark.baseline_average_amount * benchmark.baseline_weight
+                    + COALESCE(SUM(peer_category_expenses.total_amount), 0))
+                / (benchmark.baseline_weight + (SELECT COUNT(*) FROM peer_users))
+            ) AS SIGNED) AS peerAverageAmount
+        FROM target_user
+        JOIN peer_spending_benchmark benchmark
+            ON benchmark.age_group = target_user.age_group
+        JOIN expense_category category
+            ON category.expense_category_id = benchmark.expense_category_id
+        LEFT JOIN peer_category_expenses
+            ON peer_category_expenses.category_id = category.expense_category_id
+        GROUP BY
+            category.expense_category_id,
+            category.category_name,
+            benchmark.baseline_average_amount,
+            benchmark.baseline_weight
+        ORDER BY category.expense_category_id ASC
+    </select>
+</mapper>

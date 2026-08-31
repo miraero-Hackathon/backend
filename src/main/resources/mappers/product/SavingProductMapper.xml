@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.product.mapper.SavingProductMapper">
+
+    <insert id="upsert"
+            parameterType="org.jejuro.miraero.domain.product.domain.SavingProduct"
+            useGeneratedKeys="true"
+            keyProperty="savingProductId"
+            keyColumn="saving_product_id">
+        INSERT INTO saving_product (
+            financial_institution_id,
+            product_code,
+            product_name,
+            join_method,
+            join_target,
+            join_restriction,
+            special_condition,
+            maturity_interest,
+            max_limit,
+            notice,
+            disclosure_month,
+            disclosure_start_date,
+            disclosure_end_date,
+            submitted_at
+        ) VALUES (
+            #{financialInstitutionId},
+            #{productCode},
+            #{productName},
+            #{joinMethod},
+            #{joinTarget},
+            #{joinRestriction},
+            #{specialCondition},
+            #{maturityInterest},
+            #{maxLimit},
+            #{notice},
+            #{disclosureMonth},
+            #{disclosureStartDate},
+            #{disclosureEndDate},
+            #{submittedAt}
+        ) AS new
+        ON DUPLICATE KEY UPDATE
+            saving_product_id = LAST_INSERT_ID(saving_product_id),
+            product_name = new.product_name,
+            join_method = new.join_method,
+            join_target = new.join_target,
+            join_restriction = new.join_restriction,
+            special_condition = new.special_condition,
+            maturity_interest = new.maturity_interest,
+            max_limit = new.max_limit,
+            notice = new.notice,
+            disclosure_month = new.disclosure_month,
+            disclosure_start_date = new.disclosure_start_date,
+            disclosure_end_date = new.disclosure_end_date,
+            submitted_at = new.submitted_at
+    </insert>
+
+    <select id="findSavingProductList"
+            resultType="org.jejuro.miraero.domain.product.domain.SavingProductListQueryResult">
+        SELECT
+            sp.saving_product_id AS savingProductId,
+            fi.financial_institution_name AS financialInstitutionName,
+            sp.product_name AS productName,
+            option_rate.max_interest_rate AS highestInterestRate,
+            option_data.save_term AS saveTerm,
+            option_data.reserve_type AS reserveType,
+            sp.max_limit AS maxLimit,
+            sp.join_method AS joinMethod,
+            CASE
+                WHEN sp.join_restriction IN ('2', '3') THEN TRUE
+                ELSE FALSE
+            END AS hasJoinRestriction,
+            CASE
+                WHEN sp.special_condition IS NOT NULL AND TRIM(sp.special_condition) <![CDATA[<>]]> '' THEN TRUE
+                ELSE FALSE
+            END AS hasSpecialCondition
+        FROM saving_product sp
+        INNER JOIN financial_institution fi
+            ON fi.financial_institution_id = sp.financial_institution_id
+        INNER JOIN (
+            SELECT
+                saving_product_id,
+                MAX(max_interest_rate) AS max_interest_rate
+            FROM saving_option
+            GROUP BY saving_product_id
+        ) option_rate
+            ON option_rate.saving_product_id = sp.saving_product_id
+        INNER JOIN (
+            SELECT DISTINCT
+                saving_product_id,
+                save_term,
+                reserve_type
+            FROM saving_option
+        ) option_data
+            ON option_data.saving_product_id = sp.saving_product_id
+        ORDER BY option_rate.max_interest_rate DESC, sp.saving_product_id ASC,
+                 option_data.save_term ASC, option_data.reserve_type ASC
+    </select>
+
+    <select id="findSavingProductDetailById"
+            resultType="org.jejuro.miraero.domain.product.domain.SavingProductDetailQueryResult">
+        SELECT
+            sp.saving_product_id AS savingProductId,
+            fi.financial_institution_name AS financialInstitutionName,
+            sp.product_name AS productName,
+            sp.join_method AS joinMethod,
+            sp.join_target AS joinTarget,
+            sp.join_restriction AS joinRestriction,
+            CASE
+                WHEN sp.join_restriction IN ('2', '3') THEN TRUE
+                ELSE FALSE
+            END AS hasJoinRestriction,
+            sp.special_condition AS specialCondition,
+            sp.maturity_interest AS maturityInterest,
+            sp.max_limit AS maxLimit,
+            sp.notice AS notice,
+            sp.disclosure_month AS disclosureMonth,
+            sp.disclosure_start_date AS disclosureStartDate,
+            sp.disclosure_end_date AS disclosureEndDate,
+            fpl.product_page_url AS productPageUrl
+        FROM saving_product sp
+        INNER JOIN financial_institution fi
+            ON fi.financial_institution_id = sp.financial_institution_id
+        LEFT JOIN financial_product_link fpl
+            ON fpl.financial_institution_id = sp.financial_institution_id
+            AND fpl.product_type = 'SAVING'
+            AND fpl.product_code = sp.product_code
+            AND fpl.link_status = 'ACTIVE'
+        WHERE sp.saving_product_id = #{savingProductId}
+    </select>
+
+    <select id="findSavingOptionsBySavingProductId"
+            resultType="org.jejuro.miraero.domain.product.domain.SavingOption">
+        SELECT
+            saving_option_id AS savingOptionId,
+            saving_product_id AS savingProductId,
+            interest_rate_type AS interestRateType,
+            reserve_type AS reserveType,
+            save_term AS saveTerm,
+            base_interest_rate AS baseInterestRate,
+            max_interest_rate AS maxInterestRate
+        FROM saving_option
+        WHERE saving_product_id = #{savingProductId}
+        ORDER BY save_term ASC, reserve_type ASC, interest_rate_type ASC
+    </select>
+</mapper>

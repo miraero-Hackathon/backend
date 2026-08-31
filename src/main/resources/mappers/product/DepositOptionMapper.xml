@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.product.mapper.DepositOptionMapper">
+
+    <insert id="upsert"
+            parameterType="org.jejuro.miraero.domain.product.domain.DepositOption">
+        INSERT INTO deposit_option (
+            deposit_product_id,
+            interest_rate_type,
+            save_term,
+            base_interest_rate,
+            max_interest_rate
+        ) VALUES (
+            #{depositProductId},
+            #{interestRateType},
+            #{saveTerm},
+            #{baseInterestRate},
+            #{maxInterestRate}
+        ) AS new
+        ON DUPLICATE KEY UPDATE
+            base_interest_rate = new.base_interest_rate,
+            max_interest_rate = new.max_interest_rate
+    </insert>
+</mapper>

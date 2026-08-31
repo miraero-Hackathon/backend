@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.goal.milestone.mapper.MilestoneReportMapper">
+
+    <select id="findByMilestoneIds"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.MilestoneReport">
+        SELECT
+            milestone_report_id,
+            milestone_id,
+            title,
+            content,
+            status
+        FROM milestone_report
+        WHERE milestone_id IN
+            <foreach collection="milestoneIds"
+                     item="milestoneId"
+                     open="("
+                     separator=","
+                     close=")">
+                #{milestoneId}
+            </foreach>
+    </select>
+    <select id="findByMilestoneId"
+            resultType="org.jejuro.miraero.domain.goal.milestone.domain.MilestoneReport">
+        SELECT
+            milestone_report_id,
+            milestone_id,
+            title,
+            content,
+            status
+        FROM milestone_report
+        WHERE milestone_id = #{milestoneId}
+    </select>
+
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.goal.milestone.domain.MilestoneReport"
+            useGeneratedKeys="true"
+            keyProperty="milestoneReportId">
+
+        INSERT INTO milestone_report (
+            milestone_id,
+            title,
+            content,
+            status
+        )
+        VALUES (
+            #{milestoneId},
+            #{title},
+            #{content},
+            #{status}
+        )
+
+    </insert>
+
+    <insert id="insertIfAbsent"
+            parameterType="org.jejuro.miraero.domain.goal.milestone.domain.MilestoneReport"
+            useGeneratedKeys="true"
+            keyProperty="milestoneReportId">
+        INSERT INTO milestone_report
+        (
+            milestone_id,
+            title,
+            content,
+            status
+        )
+        VALUES
+        (
+            #{milestoneId},
+            #{title},
+            #{content},
+            #{status}
+        )
+        ON DUPLICATE KEY UPDATE
+            milestone_id = milestone_id
+    </insert>
+
+    <update id="updateCompleted">
+        UPDATE milestone_report
+        SET
+            title = #{title},
+            content = #{content},
+            status = 'COMPLETED'
+        WHERE milestone_report_id = #{reportId}
+            AND status = 'PENDING'
+    </update>
+
+    <update id="updateFailed">
+        UPDATE milestone_report
+            SET
+            status = 'FAILED'
+        WHERE milestone_report_id = #{reportId}
+            AND status = 'PENDING'
+    </update>
+
+    <update id="updatePending">
+        UPDATE milestone_report
+        SET
+            title = '마일스톤 리포트 생성 중',
+            content = '',
+            status = 'PENDING'
+        WHERE milestone_report_id = #{milestoneReportId}
+            AND status = 'FAILED'
+    </update>
+
+</mapper>

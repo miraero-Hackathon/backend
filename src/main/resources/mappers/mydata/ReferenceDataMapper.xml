@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.mydata.mapper.ReferenceDataMapper">
+
+  <select id="findFinancialInstitutionIdByCode" resultType="java.lang.Long">
+    SELECT financial_institution_id
+    FROM financial_institution
+    WHERE financial_institution_code = #{code}
+  </select>
+
+  <select id="findExpenseCategoryIdByName" resultType="java.lang.Long">
+    SELECT expense_category_id
+    FROM expense_category
+    WHERE category_name = #{name}
+  </select>
+</mapper>

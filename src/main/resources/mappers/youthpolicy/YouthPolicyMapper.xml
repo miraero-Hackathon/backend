@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.youthpolicy.mapper.YouthPolicyMapper">
+
+    <insert id="upsert"
+            parameterType="org.jejuro.miraero.domain.youthpolicy.domain.YouthPolicy">
+        INSERT INTO youth_policy (
+            policy_no,
+            policy_name,
+            policy_keyword,
+            policy_description,
+            support_content,
+            provider_institution_code,
+            provider_institution_name,
+            zip_cd,
+            application_start_date,
+            application_end_date,
+            application_period_text,
+            application_method,
+            application_url,
+            reference_url,
+            min_age,
+            max_age,
+            income_condition_code,
+            min_income,
+            max_income,
+            income_condition_text,
+            qualification,
+            synced_at
+        ) VALUES (
+            #{policyNo},
+            #{policyName},
+            #{policyKeyword},
+            #{policyDescription},
+            #{supportContent},
+            #{providerInstitutionCode},
+            #{providerInstitutionName},
+            #{zipCd},
+            #{applicationStartDate},
+            #{applicationEndDate},
+            #{applicationPeriodText},
+            #{applicationMethod},
+            #{applicationUrl},
+            #{referenceUrl},
+            #{minAge},
+            #{maxAge},
+            #{incomeConditionCode},
+            #{minIncome},
+            #{maxIncome},
+            #{incomeConditionText},
+            #{qualification},
+            #{syncedAt}
+        ) AS new
+        ON DUPLICATE KEY UPDATE
+            policy_name = new.policy_name,
+            policy_keyword = new.policy_keyword,
+            policy_description = new.policy_description,
+            support_content = new.support_content,
+            provider_institution_code = new.provider_institution_code,
+            provider_institution_name = new.provider_institution_name,
+            zip_cd = new.zip_cd,
+            application_start_date = new.application_start_date,
+            application_end_date = new.application_end_date,
+            application_period_text = new.application_period_text,
+            application_method = new.application_method,
+            application_url = new.application_url,
+            reference_url = new.reference_url,
+            min_age = new.min_age,
+            max_age = new.max_age,
+            income_condition_code = new.income_condition_code,
+            min_income = new.min_income,
+            max_income = new.max_income,
+            income_condition_text = new.income_condition_text,
+            qualification = new.qualification,
+            synced_at = new.synced_at
+    </insert>
+
+    <select id="findYouthPolicyIdByPolicyNo" resultType="long">
+        SELECT youth_policy_id
+        FROM youth_policy
+        WHERE policy_no = #{policyNo}
+    </select>
+
+    <delete id="deleteRegionsByYouthPolicyId">
+        DELETE FROM youth_policy_region
+        WHERE youth_policy_id = #{youthPolicyId}
+    </delete>
+
+    <insert id="insertRegions">
+        INSERT INTO youth_policy_region (
+            youth_policy_id,
+            region_code,
+            region_name,
+            is_nationwide
+        ) VALUES
+        <foreach collection="regions" item="region" separator=",">
+            (
+                #{youthPolicyId},
+                #{region.regionCode},
+                #{region.regionName},
+                #{region.nationwide}
+            )
+        </foreach>
+    </insert>
+
+    <sql id="activeYouthPolicyCondition">
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND yp.policy_keyword LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="regionCode != null and regionCode != ''">
+                AND EXISTS (
+                    SELECT 1
+                    FROM youth_policy_region ypr
+                    WHERE ypr.youth_policy_id = yp.youth_policy_id
+                      AND (ypr.region_code = #{regionCode} OR ypr.is_nationwide = TRUE)
+                )
+            </if>
+            <if test="search != null and search != ''">
+                AND yp.policy_name LIKE CONCAT('%', #{search}, '%')
+            </if>
+            AND (yp.application_end_date IS NULL OR yp.application_end_date <![CDATA[>=]]> CURDATE())
+        </where>
+    </sql>
+
+    <sql id="recommendationEligibilityCondition">
+        <where>
+            AND (yp.application_end_date IS NULL OR yp.application_end_date <![CDATA[>=]]> CURDATE())
+            AND (yp.min_age IS NULL OR yp.min_age <![CDATA[<=]]> #{age})
+            AND (yp.max_age IS NULL OR yp.max_age <![CDATA[>=]]> #{age})
+            AND (yp.min_income IS NULL OR yp.min_income <![CDATA[<=]]> #{monthlyIncome})
+            AND (yp.max_income IS NULL OR yp.max_income <![CDATA[>=]]> #{monthlyIncome})
+            <if test="regionCode != null and regionCode != ''">
+                AND EXISTS (
+                    SELECT 1
+                    FROM youth_policy_region ypr
+                    WHERE ypr.youth_policy_id = yp.youth_policy_id
+                      AND (ypr.region_code = #{regionCode} OR ypr.is_nationwide = TRUE)
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="findYouthPolicies"
+            resultType="org.jejuro.miraero.domain.youthpolicy.domain.YouthPolicyListQueryResult">
+        SELECT
+            yp.youth_policy_id AS youthPolicyId,
+            yp.policy_name AS policyName,
+            yp.policy_keyword AS policyKeyword,
+            yp.provider_institution_name AS providerInstitutionName,
+            yp.application_start_date AS applicationStartDate,
+            yp.application_end_date AS applicationEndDate,
+            yp.application_period_text AS applicationPeriodText
+        FROM youth_policy yp
+        <include refid="activeYouthPolicyCondition"/>
+        ORDER BY yp.youth_policy_id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countYouthPolicies" resultType="long">
+        SELECT COUNT(*)
+        FROM youth_policy yp
+        <include refid="activeYouthPolicyCondition"/>
+    </select>
+
+    <select id="findRecommendedYouthPolicies"
+            resultType="org.jejuro.miraero.domain.youthpolicy.domain.YouthPolicyListQueryResult">
+        SELECT
+            yp.youth_policy_id AS youthPolicyId,
+            yp.policy_name AS policyName,
+            yp.policy_keyword AS policyKeyword,
+            yp.provider_institution_name AS providerInstitutionName,
+            yp.application_start_date AS applicationStartDate,
+            yp.application_end_date AS applicationEndDate,
+            yp.application_period_text AS applicationPeriodText
+        FROM youth_policy yp
+        <include refid="recommendationEligibilityCondition"/>
+        ORDER BY yp.application_end_date IS NULL, yp.application_end_date ASC, yp.youth_policy_id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="countRecommendedYouthPolicies" resultType="long">
+        SELECT COUNT(*)
+        FROM youth_policy yp
+        <include refid="recommendationEligibilityCondition"/>
+    </select>
+
+    <select id="findYouthPolicyById"
+            resultType="org.jejuro.miraero.domain.youthpolicy.domain.YouthPolicyDetailQueryResult">
+        SELECT
+            yp.youth_policy_id AS youthPolicyId,
+            yp.policy_name AS policyName,
+            yp.policy_keyword AS policyKeyword,
+            yp.policy_description AS policyDescription,
+            yp.support_content AS supportContent,
+            yp.provider_institution_name AS providerInstitutionName,
+            yp.application_start_date AS applicationStartDate,
+            yp.application_end_date AS applicationEndDate,
+            yp.application_period_text AS applicationPeriodText,
+            yp.min_age AS minAge,
+            yp.max_age AS maxAge,
+            yp.min_income AS minIncome,
+            yp.max_income AS maxIncome,
+            yp.income_condition_text AS incomeConditionText,
+            yp.qualification AS qualification,
+            yp.application_method AS applicationMethod,
+            yp.application_url AS applicationUrl,
+            yp.reference_url AS referenceUrl
+        FROM youth_policy yp
+        WHERE yp.youth_policy_id = #{youthPolicyId}
+    </select>
+</mapper>

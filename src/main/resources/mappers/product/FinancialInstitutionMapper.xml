@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.product.mapper.FinancialInstitutionMapper">
+
+    <insert id="upsert"
+            parameterType="org.jejuro.miraero.domain.product.domain.FinancialInstitution"
+            useGeneratedKeys="true"
+            keyProperty="financialInstitutionId"
+            keyColumn="financial_institution_id">
+        INSERT INTO financial_institution (
+            financial_institution_code,
+            financial_institution_name
+        ) VALUES (
+            #{financialInstitutionCode},
+            #{financialInstitutionName}
+        ) AS new
+        ON DUPLICATE KEY UPDATE
+            financial_institution_id = LAST_INSERT_ID(financial_institution_id),
+            financial_institution_name = new.financial_institution_name
+    </insert>
+</mapper>

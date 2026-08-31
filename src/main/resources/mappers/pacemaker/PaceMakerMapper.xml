@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.pacemaker.mapper.PaceMakerMapper">
+
+  <!-- 사용자당 1개 제약(uk_auto_saving_user)은 DB가 최종적으로 보장한다 -->
+  <insert id="insertAutoSaving">
+    INSERT INTO auto_saving
+    (
+        user_id,
+        money_box_id,
+        account_id,
+        max_amount,
+        auto_saving_status
+    )
+    VALUES
+    (
+        #{userId},
+        #{moneyBoxId},
+        #{accountId},
+        #{maxAmount},
+        'ACTIVE'
+    )
+  </insert>
+
+  <select id="findByUserId"
+    parameterType="long"
+    resultType="org.jejuro.miraero.domain.pacemaker.domain.AutoSaving">
+    SELECT auto_saving_id     AS autoSavingId,
+           user_id            AS userId,
+           money_box_id       AS moneyBoxId,
+           account_id         AS accountId,
+           max_amount         AS maxAmount,
+           auto_saving_status AS autoSavingStatus
+    FROM auto_saving
+    WHERE user_id = #{userId}
+  </select>
+  
+  <select id="findDashboardByUserId"
+    parameterType="long"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerDashboardSummaryResponse">
+    SELECT a.auto_saving_id,
+           a.auto_saving_status AS status,
+           a.max_amount,
+           m.money_box_id,
+           m.balance,
+           mba.masked_account_number,
+           CASE
+             WHEN h.auto_saving_history_id IS NULL THEN FALSE
+             ELSE TRUE
+             END                AS todaySaved,
+           h.amount             AS todaySavingAmount
+    FROM auto_saving a
+           INNER JOIN money_box m
+                      ON a.money_box_id = m.money_box_id
+           LEFT JOIN account mba
+                     ON m.account_id = mba.account_id
+           LEFT JOIN auto_saving_history h
+                     ON a.auto_saving_id = h.auto_saving_id
+                       AND h.transacted_at = CURDATE()
+    WHERE a.user_id = #{userId}
+  </select>
+
+  <!-- 적립 대상. 상태가 ACTIVE인 건만 실행한다. -->
+  <select id="findActiveAutoSavings"
+    resultType="org.jejuro.miraero.domain.pacemaker.domain.AutoSaving">
+    SELECT auto_saving_id     AS autoSavingId,
+           user_id            AS userId,
+           money_box_id       AS moneyBoxId,
+           account_id         AS accountId,
+           max_amount         AS maxAmount,
+           auto_saving_status AS autoSavingStatus
+    FROM auto_saving
+    WHERE auto_saving_status = 'ACTIVE'
+    <if test="userId != null">
+      AND user_id = #{userId}
+    </if>
+    ORDER BY auto_saving_id
+  </select>
+
+  <select id="countMonthlySuccess"
+    parameterType="long"
+    resultType="int">
+    SELECT COUNT(*)
+    FROM auto_saving_history
+    WHERE auto_saving_id = #{autoSavingId}
+      AND transacted_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND transacted_at <![CDATA[<]]> DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+  </select>
+  <select id="findWeeklyStreak"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerWeeklyStreakResponse">
+    SELECT CASE week_days.day_index
+             WHEN 0 THEN 'MONDAY'
+             WHEN 1 THEN 'TUESDAY'
+             WHEN 2 THEN 'WEDNESDAY'
+             WHEN 3 THEN 'THURSDAY'
+             WHEN 4 THEN 'FRIDAY'
+             WHEN 5 THEN 'SATURDAY'
+             WHEN 6 THEN 'SUNDAY'
+             END AS dayOfWeek,
+           CASE
+             WHEN h.auto_saving_history_id IS NULL THEN FALSE
+             ELSE TRUE
+             END AS saved,
+           h.amount
+    FROM (SELECT 0 AS day_index
+          UNION ALL
+          SELECT 1
+          UNION ALL
+          SELECT 2
+          UNION ALL
+          SELECT 3
+          UNION ALL
+          SELECT 4
+          UNION ALL
+          SELECT 5
+          UNION ALL
+          SELECT 6) week_days
+           LEFT JOIN auto_saving_history h
+                     ON h.auto_saving_id = #{autoSavingId}
+                       AND h.transacted_at = DATE_ADD(
+                         DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY),
+                         INTERVAL week_days.day_index DAY
+                                             )
+    ORDER BY week_days.day_index
+  </select>
+
+  <select id="findRecentSavingDates" parameterType="long" resultType="java.time.LocalDate">
+    SELECT transacted_at
+    FROM auto_saving_history
+    WHERE auto_saving_id = #{autoSavingId}
+      AND transacted_at <![CDATA[<=]]> CURDATE()
+    ORDER BY transacted_at DESC
+    LIMIT 60
+  </select>
+  <select id="findHistories"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerHistoryResponse">
+    SELECT DATE_FORMAT(h.transacted_at, '%Y-%m-%d') AS date,
+           'SAVED'                                  AS status,
+           h.amount                                 AS amount,
+           NULL                                     AS description
+    FROM auto_saving_history h
+           JOIN auto_saving a
+                ON h.auto_saving_id = a.auto_saving_id
+    WHERE a.user_id = #{userId}
+      AND h.transacted_at <![CDATA[>=]]> #{startDateTime}
+      AND h.transacted_at <![CDATA[<]]> #{endDateTime}
+    ORDER BY h.transacted_at DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countHistories"
+    resultType="long">
+    SELECT COUNT(*)
+    FROM auto_saving_history h
+           JOIN auto_saving a
+                ON h.auto_saving_id = a.auto_saving_id
+    WHERE a.user_id = #{userId}
+      AND h.transacted_at <![CDATA[>=]]> #{startDateTime}
+      AND h.transacted_at <![CDATA[<]]> #{endDateTime}
+  </select>
+
+  <select id="findPaceMakerGoals"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerGoalSummaryResponse">
+    SELECT g.goal_id,
+           g.goal_name,
+           g.goal_type,
+           g.goal_amount
+    FROM goal g
+    WHERE g.user_id = #{userId}
+      AND g.goal_status = 'ACTIVE'
+    ORDER BY g.created_at DESC
+  </select>
+
+  <select id="findPaceMakerGoalDepositAssets"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerGoalDepositAssetRowResponse">
+    SELECT ga.goal_id,
+           ga.asset_type,
+           ga.asset_id,
+           CASE
+             WHEN ga.asset_type = 'ACCOUNT' THEN fi.financial_institution_name
+             WHEN ga.asset_type = 'MONEY_BOX' THEN mbfi.financial_institution_name
+             ELSE NULL
+             END AS financial_institution_name,
+           CASE
+             WHEN ga.asset_type = 'ACCOUNT' THEN a.masked_account_number
+             WHEN ga.asset_type = 'MONEY_BOX' THEN mba.masked_account_number
+             ELSE NULL
+             END AS masked_account_number,
+           CASE
+             WHEN ga.asset_type = 'ACCOUNT' THEN a.balance
+             WHEN ga.asset_type = 'MONEY_BOX' THEN m.balance
+             ELSE 0
+             END AS balance
+    FROM goal g
+           INNER JOIN goal_asset ga
+                      ON g.goal_id = ga.goal_id
+           LEFT JOIN account a
+                     ON ga.asset_type = 'ACCOUNT'
+                       AND ga.asset_id = a.account_id
+           LEFT JOIN financial_institution fi
+                     ON a.financial_institution_id = fi.financial_institution_id
+           LEFT JOIN money_box m
+                     ON ga.asset_type = 'MONEY_BOX'
+                       AND ga.asset_id = m.money_box_id
+           <!-- 저금통은 자체 계좌번호가 없어 소속 통장의 번호·은행명을 보여준다 -->
+           LEFT JOIN account mba
+                     ON m.account_id = mba.account_id
+           LEFT JOIN financial_institution mbfi
+                     ON mba.financial_institution_id = mbfi.financial_institution_id
+    WHERE g.user_id = #{userId}
+      AND g.goal_status = 'ACTIVE'
+      AND ga.asset_type IN ('ACCOUNT', 'MONEY_BOX')
+    ORDER BY ga.goal_id, ga.goal_asset_id
+  </select>
+
+  <select id="findPaceMakerGoalWithdrawalAccounts"
+    resultType="org.jejuro.miraero.domain.pacemaker.dto.response.PaceMakerGoalWithdrawalAccountRowResponse">
+    SELECT DISTINCT ga.goal_id,
+                    wa.account_id,
+                    fi.financial_institution_name AS financial_institution_name,
+                    wa.masked_account_number,
+                    wa.balance
+    FROM goal g
+           INNER JOIN goal_asset ga
+                      ON g.goal_id = ga.goal_id
+           LEFT JOIN account da
+                     ON ga.asset_type = 'ACCOUNT'
+                       AND ga.asset_id = da.account_id
+           LEFT JOIN money_box dm
+                     ON ga.asset_type = 'MONEY_BOX'
+                       AND ga.asset_id = dm.money_box_id
+           INNER JOIN auto_transfer at
+                      ON (ga.asset_type = 'ACCOUNT'
+                        AND at.deposit_account_id = da.account_id)
+                        OR (ga.asset_type = 'MONEY_BOX'
+                          AND at.money_box_id = dm.money_box_id)
+           INNER JOIN account wa
+                      ON at.withdrawal_account_id = wa.account_id
+           LEFT JOIN financial_institution fi
+                     ON wa.financial_institution_id = fi.financial_institution_id
+    WHERE g.user_id = #{userId}
+      AND g.goal_status = 'ACTIVE'
+      AND ga.asset_type IN ('ACCOUNT', 'MONEY_BOX')
+    ORDER BY ga.goal_id, wa.account_id
+  </select>
+  <select id="existsGoalDepositAssetByUserIdAndAsset" resultType="java.lang.Boolean">
+    SELECT EXISTS (SELECT 1
+                   FROM goal g
+                          JOIN goal_asset ga
+                               ON g.goal_id = ga.goal_id
+                   WHERE g.user_id = #{userId}
+                     AND ga.asset_type = #{assetType}
+                     AND ga.asset_id = #{assetId})
+  </select>
+
+  <update id="updateMaxAmount">
+    UPDATE auto_saving
+    SET max_amount = #{maxAmount}
+    WHERE auto_saving_id = #{autoSavingId}
+      AND user_id = #{userId}
+  </update>
+
+  <update id="updateStatus">
+    UPDATE auto_saving
+    SET auto_saving_status = #{status}
+    WHERE auto_saving_id = #{autoSavingId}
+      AND user_id = #{userId}
+  </update>
+</mapper>

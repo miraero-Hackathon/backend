@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.transaction.mapper.TransactionMapper">
+
+    <resultMap id="transactionQueryResultMap"
+               type="org.jejuro.miraero.domain.transaction.domain.TransactionQueryResult">
+        <id property="transactionId" column="transaction_id"/>
+        <result property="transactionType" column="transaction_type"/>
+        <result property="merchantName" column="merchant_name"/>
+        <result property="amount" column="amount"/>
+        <result property="balanceAfter" column="balance_after"/>
+        <result property="transactedAt" column="transacted_at"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+    </resultMap>
+
+    <sql id="transactionSearchCondition">
+        WHERE t.user_id = #{userId}
+          AND t.transacted_at <![CDATA[>=]]> #{condition.startDateTime}
+          AND t.transacted_at <![CDATA[<]]> #{condition.endDateTime}
+        <if test="condition.categoryId != null">
+            AND t.expense_category_id = #{condition.categoryId}
+        </if>
+    </sql>
+
+    <select id="findTransactions" resultMap="transactionQueryResultMap">
+        SELECT
+            t.transaction_id,
+            t.transaction_type,
+            t.merchant_name,
+            t.amount,
+            t.balance_after,
+            t.transacted_at,
+            ec.expense_category_id AS category_id,
+            ec.category_name
+        FROM `transaction` t
+        LEFT JOIN expense_category ec
+            ON t.expense_category_id = ec.expense_category_id
+        <include refid="transactionSearchCondition"/>
+        ORDER BY t.transacted_at DESC, t.transaction_id DESC
+        LIMIT #{condition.size} OFFSET #{condition.offset}
+    </select>
+
+    <select id="countTransactions" resultType="long">
+        SELECT COUNT(*)
+        FROM `transaction` t
+        <include refid="transactionSearchCondition"/>
+    </select>
+
+    <!-- 1. 최근 월급 입금 일시 N건 조회 -->
+    <select id="findLatestSalaryDateTimes"
+            resultType="java.time.LocalDateTime">
+        SELECT transacted_at
+        FROM `transaction`
+        WHERE user_id = #{userId}
+        AND transaction_type = 'DEPOSIT'
+        AND (merchant_name LIKE '%급여%' OR merchant_name LIKE '%월급%' OR merchant_name LIKE '%수당%')
+        AND transacted_at <![CDATA[<=]]> NOW()
+        ORDER BY transacted_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findLatestSalaryAccountId"
+            resultType="java.lang.Long">
+        SELECT account_id
+        FROM `transaction`
+        WHERE user_id = #{userId}
+        AND transaction_type = 'DEPOSIT'
+        AND (merchant_name LIKE '%급여%' OR merchant_name LIKE '%월급%' OR merchant_name LIKE '%수당%')
+        AND transacted_at <![CDATA[<=]]> NOW()
+        ORDER BY transacted_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="findAvailableMoneyExpenseSummary"
+            resultType="org.jejuro.miraero.domain.transaction.dto.response.AvailableMoneyExpenseSummary">
+
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN ec.expense_type = 'FIXED'
+                        THEN t.amount
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS fixedExpense,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN ec.expense_type = 'VARIABLE'
+                        THEN t.amount
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS variableExpense
+
+        FROM transaction t
+        JOIN expense_category ec
+            ON t.expense_category_id = ec.expense_category_id
+
+        WHERE t.user_id = #{userId}
+            AND t.transaction_type IN ('WITHDRAWAL', 'PAYMENT')
+            AND t.transacted_at >= #{startDateTime}
+            AND t.transacted_at <![CDATA[<]]> #{endDateTime}
+
+    </select>
+
+    <!-- 4. 오늘 지출 합산 (WITHDRAWAL + PAYMENT 반영 및 파라미터 유연성 확보) -->
+    <select id="findTodayExpenseSum"
+            resultType="long">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM `transaction`
+        WHERE user_id = #{userId}
+            AND transaction_type IN ('WITHDRAWAL', 'PAYMENT')
+            AND transacted_at <![CDATA[>=]]> #{startDateTime}
+            AND transacted_at <![CDATA[<]]> #{endDateTime}
+    </select>
+
+    <select id="findVariableExpenseSummary"
+            resultType="org.jejuro.miraero.domain.transaction.dto.response.ExpenseCategorySummaryResponse">
+
+        SELECT
+            ec.expense_category_id AS categoryId,
+            ec.category_name AS categoryName,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN t.transaction_type = 'PAYMENT'
+                            THEN t.amount
+                        WHEN t.transaction_type = 'REFUND'
+                            THEN -t.amount
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS amount
+        FROM `transaction` t
+            JOIN expense_category ec
+                ON t.expense_category_id = ec.expense_category_id
+        WHERE t.user_id = #{userId}
+            AND t.transacted_at >= #{startDate}
+            AND t.transacted_at <![CDATA[<]]> DATE_ADD(#{endDate}, INTERVAL 1 DAY)
+            AND t.transaction_type = 'PAYMENT'
+            AND ec.expense_type = 'VARIABLE'
+        GROUP BY
+            ec.expense_category_id,
+            ec.category_name
+        ORDER BY amount DESC
+
+    </select>
+
+</mapper>

@@ -1,0 +1,174 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# 같은 DEV EC2에 대한 배포가 동시에 실행되지 않도록 직렬화
+concurrency:
+  group: dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # 1. 코드 Checkout
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Java 17 설정
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # 3. WAR 빌드
+      - name: Build WAR
+        run: |
+          chmod +x gradlew
+          ./gradlew clean war -x test
+          cp build/libs/miraero-1.0-SNAPSHOT.war miraero.war
+
+      # 4. AWS OIDC 인증
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 5. 현재 GitHub Actions Runner의 Public IP 조회
+      - name: Get runner public IP
+        id: runner-ip
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUNNER_IP="$(curl --fail --silent --show-error \
+            https://checkip.amazonaws.com | tr -d '[:space:]')"
+
+          if [[ ! "$RUNNER_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "Invalid runner IPv4 address: $RUNNER_IP" >&2
+            exit 1
+          fi
+
+          echo "cidr=$RUNNER_IP/32" >> "$GITHUB_OUTPUT"
+
+      # 6. Runner IP에 대해서만 EC2 SSH(22) 임시 허용
+      - name: Allow runner SSH access
+        id: allow-ssh
+        shell: bash
+        env:
+          SECURITY_GROUP_ID: ${{ vars.EC2_SECURITY_GROUP_ID }}
+          RUNNER_CIDR: ${{ steps.runner-ip.outputs.cidr }}
+        run: |
+          set -euo pipefail
+
+          echo "rule-added=false" >> "$GITHUB_OUTPUT"
+
+          RULE_ID="$(aws ec2 authorize-security-group-ingress \
+            --group-id "$SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "$RUNNER_CIDR" \
+            --query 'SecurityGroupRules[0].SecurityGroupRuleId' \
+            --output text)"
+
+          echo "rule-id=$RULE_ID" >> "$GITHUB_OUTPUT"
+          echo "rule-added=true" >> "$GITHUB_OUTPUT"
+
+          # Security Group 반영 대기
+          sleep 5
+
+      # 7. SSH 설정
+      - name: Configure SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/id_ec2
+          chmod 600 ~/.ssh/id_ec2
+
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # 8. WAR를 EC2 임시 디렉터리에 업로드
+      - name: Upload WAR
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          scp -i ~/.ssh/id_ec2 \
+            miraero.war \
+            "$EC2_USER@$EC2_HOST:/tmp/miraero.war"
+
+      # 9. ROOT.war 배포
+      - name: Deploy WAR
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ec2 "$EC2_USER@$EC2_HOST" << 'EOF'
+            set -e
+
+            TOMCAT_HOME="/home/ubuntu/apache-tomcat-9.0.120"
+
+            echo "Deploying ROOT.war..."
+
+            # 기존 ROOT 배포본 제거
+            sudo rm -rf "$TOMCAT_HOME/webapps/ROOT"
+            sudo rm -f "$TOMCAT_HOME/webapps/ROOT.war"
+
+            # 테스트 배포본이 남아 있다면 제거
+            sudo rm -rf "$TOMCAT_HOME/webapps/miraero"
+            sudo rm -f "$TOMCAT_HOME/webapps/miraero.war"
+
+            # 새 WAR를 ROOT.war로 배포
+            sudo cp /tmp/miraero.war \
+              "$TOMCAT_HOME/webapps/ROOT.war"
+
+            sudo chown ubuntu:ubuntu \
+              "$TOMCAT_HOME/webapps/ROOT.war"
+
+            echo "Restarting Tomcat..."
+
+            sudo systemctl restart tomcat
+
+            echo "Checking Tomcat..."
+
+            sudo systemctl is-active --quiet tomcat
+
+            echo "Deploy complete."
+          EOF
+
+      # 10. Tomcat 상태 확인
+      - name: Check Tomcat status
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ec2 "$EC2_USER@$EC2_HOST" \
+            "sudo systemctl --no-pager --full status tomcat"
+
+      # 11. 임시로 허용했던 Runner SSH 규칙 제거
+      - name: Revoke runner SSH access
+        if: ${{ always() && steps.allow-ssh.outputs.rule-added == 'true' }}
+        shell: bash
+        env:
+          SECURITY_GROUP_ID: ${{ vars.EC2_SECURITY_GROUP_ID }}
+          SECURITY_GROUP_RULE_ID: ${{ steps.allow-ssh.outputs.rule-id }}
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$SECURITY_GROUP_ID" \
+            --security-group-rule-ids "$SECURITY_GROUP_RULE_ID"

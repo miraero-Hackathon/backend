@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.transaction.mapper.TransactionSyncMapper">
+
+  <!-- uk_transaction_user_ex_transaction (user_id, ex_transaction_id) 복합 UNIQUE 기준 upsert.
+       동일 사용자의 같은 외부 거래를 재동기화해도 새 행이 늘지 않고 기존 행만 갱신된다.
+       account_id/expense_category_id도 갱신 대상에 포함한 이유: 최초 동기화 시점엔 계좌/카테고리
+       매핑이 아직 없을 수 있어 null로 들어왔다가, 이후 재동기화에서 값이 채워질 수 있기 때문. -->
+  <insert id="upsert"
+    parameterType="org.jejuro.miraero.domain.transaction.domain.TransactionSyncCommand">
+    INSERT INTO `transaction` (
+    user_id, account_id, expense_category_id, ex_transaction_id,
+    transaction_type, amount, balance_after, transacted_at, merchant_name
+    )
+    VALUES (
+    #{userId}, #{accountId}, #{expenseCategoryId}, #{exTransactionId},
+    #{transactionType}, #{amount}, #{balanceAfter}, #{transactedAt}, #{merchantName}
+    )
+    ON DUPLICATE KEY UPDATE
+    account_id = VALUES(account_id),
+    expense_category_id = VALUES(expense_category_id),
+    amount = VALUES(amount),
+    balance_after = VALUES(balance_after),
+    transacted_at = VALUES(transacted_at),
+    merchant_name = VALUES(merchant_name)
+  </insert>
+</mapper>

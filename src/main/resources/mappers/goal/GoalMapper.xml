@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.goal.mapper.GoalMapper">
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.goal.domain.Goal"
+            useGeneratedKeys="true"
+            keyProperty="goalId">
+
+        INSERT INTO goal (
+            user_id,
+            goal_type,
+            goal_name,
+            goal_amount,
+            start_amount,
+            goal_date,
+            start_date,
+            goal_status
+        )
+        VALUES (
+                   #{userId},
+                   #{goalType},
+                   #{goalName},
+                   #{goalAmount},
+                   #{startAmount},
+                   #{goalDate},
+                   #{startDate},
+                'ACTIVE'
+               )
+
+    </insert>
+
+
+    <select id="findGoalsByUserId"
+    resultType="org.jejuro.miraero.domain.goal.domain.Goal">
+
+        SELECT
+            user_id,
+            goal_id,
+            goal_name,
+            goal_type,
+            goal_status,
+            goal_amount
+        FROM goal
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+
+    </select>
+
+    <select id="findById" resultType="org.jejuro.miraero.domain.goal.domain.Goal">
+        SELECT
+            goal_id,
+            user_id,
+            goal_name,
+            goal_type,
+            goal_amount,
+            start_amount,
+            goal_status,
+            start_date,
+            goal_date
+        FROM goal
+        WHERE goal_id = #{goalId}
+    </select>
+
+    <select id="findByIdAndUserId" resultType="org.jejuro.miraero.domain.goal.domain.Goal">
+        SELECT
+            goal_id,
+            user_id,
+            goal_name,
+            goal_type,
+            goal_amount,
+            start_amount,
+            goal_status,
+            start_date,
+            goal_date
+        FROM goal
+        WHERE user_id = #{userId}
+          AND goal_id = #{goalId}
+    </select>
+
+    <update id="update"
+            parameterType="org.jejuro.miraero.domain.goal.domain.Goal">
+        UPDATE goal
+        SET
+            goal_name = #{goalName},
+            goal_amount = #{goalAmount},
+            goal_date = #{goalDate}
+        WHERE goal_id = #{goalId}
+        AND user_id = #{userId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM goal
+        WHERE goal_id = #{goalId}
+    </delete>
+
+    <update id="updateCollection">
+        UPDATE goal
+        SET is_collected = TRUE
+        WHERE goal_id = #{goalId}
+        AND user_id =#{userId}
+    </update>
+
+    <update id="updateCompleteStatus">
+        UPDATE goal
+        SET goal_status = 'COMPLETED',
+            completed_date = NOW()
+        WHERE goal_id = #{goalId}
+    </update>
+    <update id="updateStatus">
+        UPDATE goal
+        SET goal_status = #{status}
+        WHERE goal_id = #{goalId}
+    </update>
+
+
+    <select id="findGoalCollectionsByUserId"
+            resultType="org.jejuro.miraero.domain.goal.domain.Goal">
+
+        SELECT
+            goal_id,
+            goal_type,
+            goal_name,
+            goal_amount,
+            is_collected
+        FROM goal
+        WHERE user_id = #{userId}
+          AND is_collected = true
+        ORDER BY completed_date DESC
+
+    </select>
+
+    <select id="existsActiveGoalByUserId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM goal
+            WHERE user_id = #{userId}
+              AND goal_status = 'ACTIVE'
+        )
+    </select>
+
+</mapper>

@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: miraero-mysql
+    restart: unless-stopped
+
+    ports:
+      - "${MYSQL_PORT}:3306"
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Seoul
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./miraero_schema.sql:/docker-entrypoint-initdb.d/miraero_schema.sql
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: miraero-redis
+    restart: unless-stopped
+
+    ports:
+      - "${REDIS_PORT}:6379"
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
+
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mysql-data:
+  redis-data:
