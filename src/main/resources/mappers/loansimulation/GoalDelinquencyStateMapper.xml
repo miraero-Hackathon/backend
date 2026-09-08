@@ -13,6 +13,7 @@
             behind_since,
             short_term_fired,
             long_term_fired,
+            overdue_count,
             on_track_since,
             consecutive_fired
         FROM goal_delinquency_state
@@ -30,6 +31,7 @@
             behind_since,
             short_term_fired,
             long_term_fired,
+            overdue_count,
             on_track_since,
             consecutive_fired
         )
@@ -38,6 +40,7 @@
                    #{behindSince},
                    #{shortTermFired},
                    #{longTermFired},
+                   #{overdueCount},
                    #{onTrackSince},
                    #{consecutiveFired}
                )
@@ -45,6 +48,7 @@
                      behind_since = VALUES(behind_since),
                      short_term_fired = VALUES(short_term_fired),
                      long_term_fired = VALUES(long_term_fired),
+                     overdue_count = VALUES(overdue_count),
                      on_track_since = VALUES(on_track_since),
                      consecutive_fired = VALUES(consecutive_fired)
     </insert>

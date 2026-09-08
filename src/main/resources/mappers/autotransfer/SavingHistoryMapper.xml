@@ -93,4 +93,20 @@
             AND h.transacted_at <![CDATA[<=]]> #{endDate}
     </select>
 
+    <!--
+        목표에 연결된 저금통(goal_asset.asset_type = 'MONEY_BOX')만 대상으로 구간 합산.
+        findSummary와 동일하게 transfer_status는 걸러내지 않는다(그 이력 테이블의 amount 자체가
+        실제로 반영된 금액이라는 기존 관례를 따름).
+    -->
+    <select id="findSavedAmountByGoal" resultType="java.lang.Long">
+        SELECT COALESCE(SUM(h.amount), 0)
+        FROM auto_saving_history h
+            JOIN goal_asset ga
+                ON ga.asset_id = h.money_box_id
+                AND ga.asset_type = 'MONEY_BOX'
+        WHERE ga.goal_id = #{goalId}
+            AND h.transacted_at <![CDATA[>=]]> #{startDate}
+            AND h.transacted_at <![CDATA[<=]]> #{endDate}
+    </select>
+
 </mapper>

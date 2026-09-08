@@ -18,6 +18,7 @@ public class GoalDelinquencyState {
     private LocalDate behindSince;
     private boolean shortTermFired;
     private boolean longTermFired;
+    private int overdueCount;
 
     private LocalDate onTrackSince;
     private boolean consecutiveFired;
@@ -28,6 +29,10 @@ public class GoalDelinquencyState {
 
     public void setShortTermFired(boolean shortTermFired) {
         this.shortTermFired = shortTermFired;
+    }
+
+    public void setOverdueCount(int overdueCount) {
+        this.overdueCount = overdueCount;
     }
 
     public void setLongTermFired(boolean longTermFired) {

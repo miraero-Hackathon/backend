@@ -7,7 +7,9 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.RequiredArgsConstructor;
 import org.jejuro.miraero.domain.loansimulation.dto.response.LoanDelinquencyExecutionResponse;
+import org.jejuro.miraero.domain.loansimulation.dto.response.LoanSimulationDetailResponse;
 import org.jejuro.miraero.domain.loansimulation.service.LoanDelinquencyExecutionService;
+import org.jejuro.miraero.domain.loansimulation.service.LoanSimulationQueryService;
 import org.jejuro.miraero.global.exception.BusinessException;
 import org.jejuro.miraero.global.exception.CommonErrorCode;
 import org.jejuro.miraero.global.response.ApiResponse;
@@ -15,10 +17,7 @@ import org.jejuro.miraero.global.security.AuthenticatedUser;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/loan-simulations")
@@ -27,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class LoanDelinquencyController {
 
     private final LoanDelinquencyExecutionService loanDelinquencyExecutionService;
+    private final LoanSimulationQueryService loanSimulationQueryService;
 
     @PostMapping("/execute")
     @ApiOperation(
@@ -55,4 +55,21 @@ public class LoanDelinquencyController {
                         .build()
         ));
     }
+
+    @GetMapping("/{goalId}")
+    @ApiOperation(
+            value = "대출 시뮬레이션 상세 조회",
+            notes = "로그인 사용자가 소유한 목표를 대출로 미러링한 현재 상환 현황(원금·상환액·진행률·페이스)과 "
+                    + "연체/연속상환 판정 상태를 조회합니다. 판정 상태는 매일 08:00 배치(또는 /execute 즉시 실행) "
+                    + "기준으로 갱신되며, 그 외 필드는 조회 시점 기준으로 실시간 계산됩니다."
+    )
+    public ResponseEntity<ApiResponse<LoanSimulationDetailResponse>> getDetail(
+            @ApiParam(value = "목표(대출) ID", example = "1", required = true) @PathVariable Long goalId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                loanSimulationQueryService.getDetail(user.getUserId(), goalId)
+        ));
+    }
 }
+

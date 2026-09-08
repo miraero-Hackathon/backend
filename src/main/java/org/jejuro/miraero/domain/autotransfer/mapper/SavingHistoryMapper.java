@@ -50,4 +50,16 @@ public interface SavingHistoryMapper {
       @Param("startDate") LocalDate startDate,
       @Param("endDate") LocalDate endDate
   );
+
+  /**
+   * 특정 목표에 연결된 저금통에 구간 내 실제로 적립된 금액 합계.
+   * 대출 시뮬레이션 화면의 "이번 달 상환액"에 사용한다.
+   *
+   * @return 이력이 하나도 없어도 0을 반환한다
+   */
+  Long findSavedAmountByGoal(
+      @Param("goalId") Long goalId,
+      @Param("startDate") LocalDate startDate,
+      @Param("endDate") LocalDate endDate
+  );
 }

@@ -85,6 +85,7 @@ public class LoanDelinquencyExecutor {
                     today.atStartOfDay()
             );
             state.setShortTermFired(true);
+            state.setOverdueCount(state.getOverdueCount() + 1);
         }
 
         if (daysBehind >= LONG_TERM_OVERDUE_DAYS && !state.isLongTermFired()) {
