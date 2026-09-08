@@ -44,4 +44,8 @@ public interface GoalMapper {
   );
 
   boolean existsActiveGoalByUserId(@Param("userId") Long userId);
+
+  // 대출 시뮬레이션 배치가 매일 순회할 대상. userId를 null로 주면 전체 유저 대상
+  // (AutoTransferMapper.findExecutionTargets와 동일한 관례 — 시연용 "특정 유저만 실행"도 지원하려고).
+  List<Goal> findActiveGoals(@Param("userId") Long userId);
 }

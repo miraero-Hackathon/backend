@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.utilitypayment.mapper.UtilityPaymentStateMapper">
+
+    <select id="findByUserIdAndType" resultType="org.jejuro.miraero.domain.utilitypayment.domain.UtilityPaymentState">
+        SELECT
+            utility_payment_state_id,
+            user_id,
+            utility_type,
+            consecutive_paid_months,
+            consecutive_missed_months
+        FROM utility_payment_state
+        WHERE user_id = #{userId}
+          AND utility_type = #{utilityType}
+    </select>
+
+    <select id="findByUserId" resultType="org.jejuro.miraero.domain.utilitypayment.domain.UtilityPaymentState">
+        SELECT
+            utility_payment_state_id,
+            user_id,
+            utility_type,
+            consecutive_paid_months,
+            consecutive_missed_months
+        FROM utility_payment_state
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="upsert" parameterType="org.jejuro.miraero.domain.utilitypayment.domain.UtilityPaymentState">
+        INSERT INTO utility_payment_state (
+            user_id,
+            utility_type,
+            consecutive_paid_months,
+            consecutive_missed_months
+        )
+        VALUES (
+                   #{userId},
+                   #{utilityType},
+                   #{consecutivePaidMonths},
+                   #{consecutiveMissedMonths}
+               )
+        ON DUPLICATE KEY UPDATE
+                             consecutive_paid_months = VALUES(consecutive_paid_months),
+                             consecutive_missed_months = VALUES(consecutive_missed_months)
+    </insert>
+
+</mapper>

@@ -3,6 +3,8 @@ package org.jejuro.miraero.domain.goal.service;
 import lombok.RequiredArgsConstructor;
 import org.jejuro.miraero.domain.availablemoney.dto.response.MonthlyAvailableMoneyResponse;
 import org.jejuro.miraero.domain.availablemoney.service.AvailableMoneyService;
+import org.jejuro.miraero.domain.credit.domain.CreditScoreReasonCode;
+import org.jejuro.miraero.domain.credit.service.CreditScoreService;
 import org.jejuro.miraero.domain.goal.calculator.GoalPaceCalculator;
 import org.jejuro.miraero.domain.goal.domain.Goal;
 import org.jejuro.miraero.domain.goal.domain.GoalPossibility;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
@@ -42,6 +45,7 @@ public class GoalServiceImpl implements GoalService{
     private final AvailableMoneyService availableMoneyService;
     private final UserService userService;
     private final GoalPaceCalculator goalPaceCalculator;
+    private final CreditScoreService creditScoreService;
 
 
     /**
@@ -177,6 +181,13 @@ public class GoalServiceImpl implements GoalService{
                 request.getStartAmount()
         );
 
+        //5. 신용점수 코어 초기화 (없으면 665점 생성) — 대출 시뮬레이션(2단계)이
+        //   나중에 이 목표를 미러링해서 판정을 시작할 텐데, 그 전에 신용점수가
+        //   이미 존재하는 걸 보장해두기 위함.
+        creditScoreService.initializeCreditScore(userId);
+
+
+
 
         return GoalCreateResponse.builder()
                 .goalId(goal.getGoalId())
@@ -299,6 +310,18 @@ public class GoalServiceImpl implements GoalService{
 
             goalMapper.updateCompleteStatus(goal.getGoalId());
             goal.changeStatus(GoalStatus.COMPLETED);
+
+            // 대출 시뮬레이션: 원금 완납 가점. 이 if문 자체가 "상태가 COMPLETED가
+            // 아닐 때만" 조건이라, DB에 이미 COMPLETED로 저장된 뒤 재조회하면
+            // 이 블록에 다시 안 들어와서 자연스럽게 "딱 한 번만" 발생함
+            // (goalMapper.updateCompleteStatus가 먼저 실행돼서 다음 조회부턴 이미 COMPLETED이므로).
+            creditScoreService.applyEvent(
+                    userId,
+                    100,
+                    CreditScoreReasonCode.LOAN_FULLY_REPAID,
+                    "'" + goal.getGoalName() + "' 원금 완납",
+                    LocalDateTime.now()
+            );
         }
 
         // 기간 정보 생성

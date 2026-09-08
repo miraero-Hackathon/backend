@@ -23,7 +23,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "org.jejuro.miraero.domain.autotransfer.mapper",
     "org.jejuro.miraero.domain.account.mapper",
     "org.jejuro.miraero.domain.goal.milestone.mapper",
-    "org.jejuro.miraero.domain.youthpolicy.mapper"
+    "org.jejuro.miraero.domain.youthpolicy.mapper",
+    "org.jejuro.miraero.domain.credit.mapper",
+    "org.jejuro.miraero.domain.loansimulation.mapper",
+    "org.jejuro.miraero.domain.utilitypayment.mapper",
+    "org.jejuro.miraero.domain.card.mapper",
+    "org.jejuro.miraero.domain.checkcard.mapper"
 })
 public class MyBatisConfig {
 

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.credit.mapper.CreditScoreEventMapper">
+
+    <insert id="save"
+            parameterType="org.jejuro.miraero.domain.credit.domain.CreditScoreEvent"
+            useGeneratedKeys="true"
+            keyProperty="creditScoreEventId">
+
+        INSERT INTO credit_score_event (
+        user_id,
+        reason_code,
+        delta,
+        score_after,
+        description,
+        occurred_at
+        )
+        VALUES (
+        #{userId},
+        #{reasonCode},
+        #{delta},
+        #{scoreAfter},
+        #{description},
+        #{occurredAt}
+        )
+
+    </insert>
+
+
+    <select id="findEventByUserId" resultType="org.jejuro.miraero.domain.credit.domain.CreditScoreEvent">
+        SELECT
+            credit_score_event_id,
+            user_id,
+            reason_code,
+            delta,
+            score_after,
+            description,
+            occurred_at
+        FROM credit_score_event
+        WHERE user_id = #{userId}
+        ORDER BY occurred_at DESC, credit_score_event_id DESC
+        LIMIT #{condition.size} OFFSET #{condition.offset}
+    </select>
+
+    <select id="countEventByUserId" resultType="long">
+        SELECT COUNT(*)
+        FROM credit_score_event
+        WHERE user_id = #{userId}
+    </select>
+</mapper>

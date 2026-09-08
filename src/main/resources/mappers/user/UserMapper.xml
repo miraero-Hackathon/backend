@@ -97,7 +97,9 @@
     WHERE user_id = #{userId}
   </select>
 
-  <update id="updateKbPayId">
+
+
+    <update id="updateKbPayId">
     UPDATE miraero_user
     SET kb_pay_id = #{kbPayId}
     WHERE user_id = #{userId}
@@ -113,5 +115,10 @@
         monthly_income = #{monthlyIncome}
     WHERE user_id = #{userId}
   </update>
+
+  <select id="findAllUserIds" resultType="java.lang.Long">
+    SELECT user_id
+    FROM miraero_user
+  </select>
 </mapper>
 

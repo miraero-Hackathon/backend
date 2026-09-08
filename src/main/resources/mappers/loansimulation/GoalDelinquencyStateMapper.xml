@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.loansimulation.mapper.GoalDelinquencyStateMapper">
+
+    <select id="findByGoalId" resultType="org.jejuro.miraero.domain.loansimulation.domain.GoalDelinquencyState">
+        SELECT
+            goal_delinquency_state_id,
+            goal_id,
+            behind_since,
+            short_term_fired,
+            long_term_fired,
+            on_track_since,
+            consecutive_fired
+        FROM goal_delinquency_state
+        WHERE goal_id = #{goalId}
+    </select>
+
+    <!--
+        goal_id에 UNIQUE 제약이 있어서, 이미 있는 goal_id로 INSERT를 시도하면
+        MySQL이 자동으로 UPDATE 절을 대신 실행해준다. 그래서 "있는지 먼저 확인" 없이
+        이 메서드 하나만 호출하면 생성/갱신이 다 처리됨.
+    -->
+    <insert id="upsert" parameterType="org.jejuro.miraero.domain.loansimulation.domain.GoalDelinquencyState">
+        INSERT INTO goal_delinquency_state (
+            goal_id,
+            behind_since,
+            short_term_fired,
+            long_term_fired,
+            on_track_since,
+            consecutive_fired
+        )
+        VALUES (
+                   #{goalId},
+                   #{behindSince},
+                   #{shortTermFired},
+                   #{longTermFired},
+                   #{onTrackSince},
+                   #{consecutiveFired}
+               )
+        ON DUPLICATE KEY UPDATE
+                     behind_since = VALUES(behind_since),
+                     short_term_fired = VALUES(short_term_fired),
+                     long_term_fired = VALUES(long_term_fired),
+                     on_track_since = VALUES(on_track_since),
+                     consecutive_fired = VALUES(consecutive_fired)
+    </insert>
+
+</mapper>

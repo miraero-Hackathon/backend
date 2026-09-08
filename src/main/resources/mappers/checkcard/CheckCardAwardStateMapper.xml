@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.checkcard.mapper.CheckCardAwardStateMapper">
+
+    <select id="findByUserId" resultType="org.jejuro.miraero.domain.checkcard.domain.CheckCardAwardState">
+        SELECT check_card_award_state_id, user_id, last_awarded_year_month
+        FROM check_card_award_state
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- user_id UNIQUE 기준 upsert -->
+    <insert id="upsert" parameterType="org.jejuro.miraero.domain.checkcard.domain.CheckCardAwardState">
+        INSERT INTO check_card_award_state (
+            user_id, last_awarded_year_month
+        ) VALUES (
+            #{userId}, #{lastAwardedYearMonth}
+        )
+        ON DUPLICATE KEY UPDATE
+            last_awarded_year_month = VALUES(last_awarded_year_month)
+    </insert>
+
+</mapper>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.jejuro.miraero.domain.credit.mapper.CreditScoreMapper">
+
+    <insert id="insertIfAbsent">
+        INSERT IGNORE INTO credit_score (
+            user_id,
+            current_score,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{userId},
+            #{initialScore},
+            NOW(),
+            NOW())
+    </insert>
+
+    <select id="findByUserId" resultType="org.jejuro.miraero.domain.credit.domain.CreditScore">
+        SELECT
+            credit_score_id,
+            user_id,
+            current_score,
+            created_at,
+            updated_at
+        FROM credit_score
+        WHERE user_id = #{userId}
+    </select>
+
+
+    <!--
+          LEAST(상한, GREATEST(하한, 값)) 은 MySQL에서 "값을 [하한, 상한] 범위로 눌러 담는" 흔한 관용구.
+          GREATEST(minScore, current_score + delta)로 하한 밑으로 안 내려가게 하고,
+          그 결과를 다시 LEAST(maxScore, ...)로 상한 위로 안 올라가게 함.
+      -->
+    <update id="applyDelta">
+        UPDATE credit_score
+        SET
+            current_score = LEAST(#{maxScore}, GREATEST(#{minScore}, current_score + #{delta})),
+            updated_at = NOW()
+        WHERE user_id = #{userId}
+    </update>
+
+</mapper>

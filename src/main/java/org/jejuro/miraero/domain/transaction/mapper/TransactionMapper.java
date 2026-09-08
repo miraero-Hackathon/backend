@@ -46,4 +46,19 @@ public interface TransactionMapper {
             @Param("endDate") LocalDate endDate
     );
 
+    // 특정 유저가 특정 기간 동안, 주어진 가맹점명 패턴 중 하나라도 일치하는 거래를 했는지 확인.
+    boolean existsPaymentInPeriod(
+            @Param("userId") Long userId,
+            @Param("patterns") List<String> merchantNamePatterns,
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
+    );
+
+    // 특정 카드로 특정 기간 동안 결제(PAYMENT)한 금액 합계 — 체크카드 사용 실적 판정용
+    Long sumPaymentAmountByCardInPeriod(
+            @Param("cardId") Long cardId,
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
+    );
+
 }

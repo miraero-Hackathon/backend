@@ -156,4 +156,29 @@
 
     </select>
 
+    <select id="existsPaymentInPeriod" resultType="boolean">
+        SELECT EXISTS (
+        SELECT 1
+        FROM `transaction`
+        WHERE user_id = #{userId}
+        AND transacted_at &gt;= #{startDateTime}
+        AND transacted_at &lt; #{endDateTime}
+        AND (
+            <foreach item="pattern" collection="patterns" separator=" OR ">
+                merchant_name LIKE CONCAT('%', #{pattern}, '%')
+            </foreach>
+            )
+        )
+    </select>
+
+    <select id="sumPaymentAmountByCardInPeriod" resultType="long">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM `transaction`
+        WHERE card_id = #{cardId}
+        AND transaction_type = 'PAYMENT'
+        AND transacted_at &gt;= #{startDateTime}
+        AND transacted_at &lt; #{endDateTime}
+    </select>
+
+
 </mapper>

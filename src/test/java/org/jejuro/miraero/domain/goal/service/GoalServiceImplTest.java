@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
+import org.jejuro.miraero.domain.credit.service.CreditScoreService;
 import org.jejuro.miraero.domain.goal.domain.*;
 import org.jejuro.miraero.domain.goal.dto.request.GoalAssetRequest;
 import org.jejuro.miraero.domain.goal.dto.request.GoalCreateRequest;
@@ -38,6 +39,9 @@ class GoalServiceImplTest {
 
     @InjectMocks
     private GoalServiceImpl goalService;
+
+    @Mock
+    private CreditScoreService creditScoreService;
 
     private GoalPossibilityRequest createRequest(
             Long goalAmount,

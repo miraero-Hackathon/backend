@@ -142,4 +142,23 @@
         )
     </select>
 
+    <select id="findActiveGoals" resultType="org.jejuro.miraero.domain.goal.domain.Goal">
+        SELECT
+        goal_id,
+        user_id,
+        goal_name,
+        goal_type,
+        goal_amount,
+        start_amount,
+        goal_status,
+        start_date,
+        goal_date
+        FROM goal
+        WHERE goal_status = 'ACTIVE'
+        <if test="userId != null">
+            AND user_id = #{userId}
+        </if>
+    </select>
+
+
 </mapper>

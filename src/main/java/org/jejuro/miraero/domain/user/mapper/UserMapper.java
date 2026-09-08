@@ -1,6 +1,7 @@
 package org.jejuro.miraero.domain.user.mapper;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.apache.ibatis.annotations.Param;
 import org.jejuro.miraero.domain.user.domain.User;
@@ -35,5 +36,8 @@ public interface UserMapper {
       @Param("companyName") String companyName,
       @Param("monthlyIncome") Long monthlyIncome
   );
+
+  // 통신비/공과금 배치가 매달 순회할 전체 유저 목록
+  List<Long> findAllUserIds();
 }
 

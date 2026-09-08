@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jejuro.miraero.domain.checkcard.mapper.CheckCardUsageStateMapper">
+
+    <select id="findByCardId" resultType="org.jejuro.miraero.domain.checkcard.domain.CheckCardUsageState">
+        SELECT check_card_usage_state_id, user_id, card_id, consecutive_qualified_months
+        FROM check_card_usage_state
+        WHERE card_id = #{cardId}
+    </select>
+
+    <select id="findByUserId" resultType="org.jejuro.miraero.domain.checkcard.domain.CheckCardUsageState">
+        SELECT check_card_usage_state_id, user_id, card_id, consecutive_qualified_months
+        FROM check_card_usage_state
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- card_id UNIQUE 기준 upsert. userId는 최초 삽입 시에만 의미 있고 이후엔 안 바뀌므로 갱신 대상에서 뺐다. -->
+    <insert id="upsert" parameterType="org.jejuro.miraero.domain.checkcard.domain.CheckCardUsageState">
+        INSERT INTO check_card_usage_state (
+        user_id, card_id, consecutive_qualified_months
+        ) VALUES (
+        #{userId}, #{cardId}, #{consecutiveQualifiedMonths}
+        )
+        ON DUPLICATE KEY UPDATE
+        consecutive_qualified_months = VALUES(consecutive_qualified_months)
+    </insert>
+
+</mapper>

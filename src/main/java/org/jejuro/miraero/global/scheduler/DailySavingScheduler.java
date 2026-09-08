@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.jejuro.miraero.domain.loansimulation.service.LoanDelinquencyExecutionService;
 
 /**
  * 매일 08:00에 저금통 적립을 처리한다.
@@ -29,6 +30,7 @@ public class DailySavingScheduler {
 
     private final AutoTransferExecutionService autoTransferExecutionService;
     private final PaceMakerSavingService paceMakerSavingService;
+    private final LoanDelinquencyExecutionService loanDelinquencyExecutionService;
 
     @Scheduled(cron = "0 0 8 * * *")
     public void runDailySaving() {
@@ -46,6 +48,14 @@ public class DailySavingScheduler {
             paceMakerSavingService.saveAll(today.minusDays(1), null);
         } catch (Exception e) {
             log.error("페이스메이커 적립 배치 실패", e);
+        }
+
+        // 대출 시뮬레이션(신용점수) 판정 — 위 두 작업으로 오늘의 저축 반영이 끝난 뒤에 돌아야
+        // "오늘 기준으로 부족한지"가 정확하게 계산됨
+        try {
+            loanDelinquencyExecutionService.executeAll(today, null);
+        } catch (Exception e) {
+            log.error("대출 시뮬레이션 배치 실패", e);
         }
     }
 }
